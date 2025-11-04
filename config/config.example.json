@@ -1,0 +1,8 @@
+{
+  "server_port": 6767,
+  "db_host": "localhost",
+  "db_port": 5432,
+  "db_database": "kvault",
+  "db_username": "postgres",
+  "db_password": "postgres"
+}
