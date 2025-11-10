@@ -19,7 +19,7 @@ type Config struct {
 	ConnMaxLifetime time.Duration
 }
 
-func InitPostgres(config Config) (*Postgres, error) {
+func NewPostgres(config Config) (*Postgres, error) {
 	db, err := sqlx.Connect("postgres", config.DSN)
 	if err != nil {
 		return nil, err

@@ -35,7 +35,7 @@ func main() {
 		ConnMaxLifetime: time.Minute * 5,
 	}
 
-	pg, err := postgres.InitPostgres(pgConfig)
+	pg, err := postgres.NewPostgres(pgConfig)
 	if err != nil {
 		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
 	}
