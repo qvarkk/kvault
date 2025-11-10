@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"qvarkk/kvault/config"
+	"qvarkk/kvault/internal/migrations"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/logger"
 	"time"
@@ -39,6 +40,11 @@ func main() {
 		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
 	}
 	defer pg.Close()
+
+	err = migrations.RunMigrations(pg.GetDB().DB, config.DBDatabase, "file://migrations")
+	if err != nil {
+		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
+	}
 
 	r := gin.Default()
 
