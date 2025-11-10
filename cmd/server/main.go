@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/migrations"
 	"qvarkk/kvault/internal/postgres"
+	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/routes"
 	"qvarkk/kvault/logger"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
@@ -46,13 +46,10 @@ func main() {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
 	}
 
-	r := gin.Default()
+	repos := &routes.Repos{
+		UserRepo: repo.NewUserRepo(pg.GetDB()),
+	}
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-
+	r := routes.SetupRouter(repos)
 	r.Run()
 }
