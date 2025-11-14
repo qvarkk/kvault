@@ -3,9 +3,13 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserHandler struct {
@@ -14,6 +18,62 @@ type UserHandler struct {
 
 func NewUserHandler(userRepo *repo.UserRepo) *UserHandler {
 	return &UserHandler{userRepo: userRepo}
+}
+
+type createUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
+func (h *UserHandler) CreateUser(c *gin.Context) {
+	var req createUserRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		errors := utils.FormatValidationErrors(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errors})
+		return
+	}
+
+	var APIKey string
+	for {
+		var err error
+		if APIKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var isKeyUnique bool
+		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), APIKey); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if isKeyUnique {
+			break
+		}
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	user := domain.User{
+		Email:     req.Email,
+		Password:  string(passwordHash),
+		APIKey:    APIKey,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	err = h.userRepo.CreateUser(context.Background(), &user)
+	if err != nil {
+		status, message := utils.ParseDBError(err)
+		c.JSON(status, gin.H{"error": message})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"status": "user created", "user": user})
 }
 
 func (h *UserHandler) GetUserByEmail(c *gin.Context) {

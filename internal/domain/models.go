@@ -21,7 +21,7 @@ const (
 type User struct {
 	ID        string    `db:"id"`
 	Email     string    `db:"email"`
-	Password  string    `db:"password"`
+	Password  string    `db:"password" json:"-"`
 	APIKey    string    `db:"api_key"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
