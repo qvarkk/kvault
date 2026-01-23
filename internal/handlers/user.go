@@ -25,6 +25,11 @@ type createUserRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
+type authenticateUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req createUserRequest
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
@@ -73,7 +78,27 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"status": "user created", "user": user})
+	c.JSON(http.StatusCreated, gin.H{"message": "user created", "user": user})
+}
+
+func (h *UserHandler) AuthenticateUser(c *gin.Context) {
+	var req authenticateUserRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		errors := utils.FormatValidationErrors(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errors})
+		return
+	}
+
+	api_key, err := h.userRepo.AuthenticateUser(c, req.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if api_key == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong credentials"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "authentication successful", "api_key": api_key})
 }
 
 func (h *UserHandler) GetUserByEmail(c *gin.Context) {
@@ -89,9 +114,9 @@ func (h *UserHandler) GetUserByEmail(c *gin.Context) {
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }

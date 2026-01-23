@@ -17,7 +17,8 @@ func SetupRouter(repos *Repos) *gin.Engine {
 	userHandler := handlers.NewUserHandler(repos.UserRepo)
 
 	// r.GET("/users", userHandler.GetUserByEmail) TODO: RBAC
-	r.POST("/users", userHandler.CreateUser)
+	r.POST("/auth/register", userHandler.CreateUser)
+	r.POST("/auth/login", userHandler.AuthenticateUser)
 
 	return r
 }
