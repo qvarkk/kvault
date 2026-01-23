@@ -48,7 +48,7 @@ func (r *UserRepo) IsAPIKeyUnique(ctx context.Context, APIKey string) (bool, err
 	}
 }
 
-func (r *UserRepo) AuthenticateUser(ctx context.Context, email string, password string) (*string, error) {
+func (r *UserRepo) AuthenticateUser(ctx context.Context, email string, password string) (*domain.User, error) {
 	var user domain.User
 
 	err := r.db.GetContext(ctx, &user, getUserByEmailQuery, email)
@@ -64,7 +64,7 @@ func (r *UserRepo) AuthenticateUser(ctx context.Context, email string, password 
 		return nil, err
 	}
 
-	return &user.APIKey, nil
+	return &user, nil
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {

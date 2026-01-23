@@ -78,7 +78,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "user created", "user": user})
+	c.JSON(http.StatusCreated, user)
 }
 
 func (h *UserHandler) AuthenticateUser(c *gin.Context) {
@@ -89,16 +89,16 @@ func (h *UserHandler) AuthenticateUser(c *gin.Context) {
 		return
 	}
 
-	api_key, err := h.userRepo.AuthenticateUser(c, req.Email, req.Password)
+	user, err := h.userRepo.AuthenticateUser(c, req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	if api_key == nil {
+	if user == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong credentials"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "authentication successful", "api_key": api_key})
+	c.JSON(http.StatusOK, user)
 }
 
 func (h *UserHandler) GetUserByEmail(c *gin.Context) {
@@ -118,5 +118,5 @@ func (h *UserHandler) GetUserByEmail(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, user)
 }
