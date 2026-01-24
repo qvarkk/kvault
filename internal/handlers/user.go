@@ -4,11 +4,14 @@ import (
 	"context"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/internal/errors"
 	"qvarkk/kvault/internal/repo"
 	"qvarkk/kvault/internal/utils"
+	"qvarkk/kvault/logger"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -33,22 +36,27 @@ type authenticateUserRequest struct {
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req createUserRequest
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		errors := utils.FormatValidationErrors(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errors})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusBadRequest, c.FullPath(), "")
+		rfc9457Err.Validation = errors.FormatValidationErrors(err)
+		c.JSON(http.StatusBadRequest, rfc9457Err)
 		return
 	}
 
-	var APIKey string
+	var apiKey string
 	for {
 		var err error
-		if APIKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if apiKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
+			rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+			logger.Logger.Error("Failed to generate API key", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, rfc9457Err)
 			return
 		}
 
 		var isKeyUnique bool
-		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), APIKey); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), apiKey); err != nil {
+			rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+			logger.Logger.Error("Failed to check if generated API key is unique", zap.Error(err), zap.String("key", apiKey))
+			c.JSON(http.StatusInternalServerError, rfc9457Err)
 			return
 		}
 
@@ -59,22 +67,25 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+		logger.Logger.Error("Failed to hash password", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, rfc9457Err)
 		return
 	}
 
 	user := domain.User{
 		Email:     req.Email,
 		Password:  string(passwordHash),
-		APIKey:    APIKey,
+		APIKey:    apiKey,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
 	err = h.userRepo.CreateUser(context.Background(), &user)
 	if err != nil {
-		status, message := utils.ParseDBError(err)
-		c.JSON(status, gin.H{"error": message})
+		status, message := errors.ParseDBError(err)
+		rfc9457Err := errors.FormRFC9457Error(status, c.FullPath(), message)
+		c.JSON(status, rfc9457Err)
 		return
 	}
 
@@ -84,37 +95,53 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 func (h *UserHandler) AuthenticateUser(c *gin.Context) {
 	var req authenticateUserRequest
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		errors := utils.FormatValidationErrors(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errors})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusBadRequest, c.FullPath(), "")
+		rfc9457Err.Validation = errors.FormatValidationErrors(err)
+		c.JSON(http.StatusBadRequest, rfc9457Err)
 		return
 	}
 
-	user, err := h.userRepo.AuthenticateUser(c, req.Email, req.Password)
+	user, err := h.userRepo.GetByEmail(c, req.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		status, message := errors.ParseDBError(err)
+		rfc9457Err := errors.FormRFC9457Error(status, c.FullPath(), message)
+		c.JSON(status, rfc9457Err)
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong credentials"})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusUnauthorized, c.FullPath(), "")
+		c.JSON(http.StatusUnauthorized, rfc9457Err)
 		return
 	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	if err != nil {
+		rfc9457Err := errors.FormRFC9457Error(http.StatusUnauthorized, c.FullPath(), "")
+		c.JSON(http.StatusUnauthorized, rfc9457Err)
+		return
+	}
+
 	c.JSON(http.StatusOK, user)
 }
 
 func (h *UserHandler) GetUserByEmail(c *gin.Context) {
 	email := c.Query("email")
 	if email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email query parameter is required"})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusBadRequest, c.FullPath(), "Email query parameter is required.")
+		c.JSON(http.StatusBadRequest, rfc9457Err)
 		return
 	}
 
 	user, err := h.userRepo.GetByEmail(context.Background(), email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		status, message := errors.ParseDBError(err)
+		rfc9457Err := errors.FormRFC9457Error(status, c.FullPath(), message)
+		c.JSON(status, rfc9457Err)
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		rfc9457Err := errors.FormRFC9457Error(http.StatusNotFound, c.FullPath(), "User with this email not found.")
+		c.JSON(http.StatusNotFound, rfc9457Err)
 		return
 	}
 

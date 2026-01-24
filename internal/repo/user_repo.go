@@ -6,7 +6,6 @@ import (
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserRepo struct {
@@ -46,25 +45,6 @@ func (r *UserRepo) IsAPIKeyUnique(ctx context.Context, APIKey string) (bool, err
 	} else {
 		return false, nil
 	}
-}
-
-func (r *UserRepo) AuthenticateUser(ctx context.Context, email string, password string) (*domain.User, error) {
-	var user domain.User
-
-	err := r.db.GetContext(ctx, &user, getUserByEmailQuery, email)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
