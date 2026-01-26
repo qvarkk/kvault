@@ -2,6 +2,7 @@ package routes
 
 import (
 	"qvarkk/kvault/internal/handlers"
+	"qvarkk/kvault/internal/middleware"
 	"qvarkk/kvault/internal/repo"
 
 	"github.com/gin-gonic/gin"
@@ -19,9 +20,13 @@ func SetupRouter(repos *Repos) *gin.Engine {
 
 	apiGroup := r.Group("/api")
 	{
-		apiGroup.GET("/users", userHandler.GetUserByEmail) // TODO: RBAC, fix the idea that /users route only gets user by email lol
 		apiGroup.POST("/auth/register", authHandler.RegisterUser)
 		apiGroup.POST("/auth/login", authHandler.AuthenticateUser)
+
+		authRequired := apiGroup.Group("/", middleware.AuthRequired(repos.UserRepo))
+		{
+			authRequired.GET("/users", userHandler.GetUserByEmail) // TODO: RBAC, fix the idea that /users route only gets user by email lol
+		}
 	}
 
 	return r

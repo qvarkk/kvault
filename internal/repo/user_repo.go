@@ -30,6 +30,10 @@ const getUserByEmailQuery = `
 	SELECT * FROM users WHERE email=$1
 `
 
+const getUserByApiKeyQuery = `
+	SELECT * FROM users WHERE api_key=$1
+`
+
 func (r *UserRepo) CreateUser(ctx context.Context, user *domain.User) error {
 	return r.db.QueryRowxContext(ctx, createUserQuery, user.Email, user.Password, user.APIKey).
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
@@ -51,6 +55,20 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 	var user domain.User
 
 	err := r.db.GetContext(ctx, &user, getUserByEmailQuery, email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepo) GetByApiKey(ctx context.Context, api_key string) (*domain.User, error) {
+	var user domain.User
+
+	err := r.db.GetContext(ctx, &user, getUserByApiKeyQuery, api_key)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
