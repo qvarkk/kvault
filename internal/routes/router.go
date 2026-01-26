@@ -15,10 +15,14 @@ func SetupRouter(repos *Repos) *gin.Engine {
 	r := gin.Default()
 
 	userHandler := handlers.NewUserHandler(repos.UserRepo)
+	authHandler := handlers.NewAuthHandler(repos.UserRepo)
 
-	// r.GET("/users", userHandler.GetUserByEmail) TODO: RBAC
-	r.POST("/auth/register", userHandler.CreateUser)
-	r.POST("/auth/login", userHandler.AuthenticateUser)
+	apiGroup := r.Group("/api")
+	{
+		apiGroup.GET("/users", userHandler.GetUserByEmail) // TODO: RBAC, fix the idea that /users route only gets user by email lol
+		apiGroup.POST("/auth/register", authHandler.RegisterUser)
+		apiGroup.POST("/auth/login", authHandler.AuthenticateUser)
+	}
 
 	return r
 }
