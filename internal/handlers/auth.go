@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/errors"
@@ -41,27 +42,12 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	var apiKey string
-	for {
-		var err error
-		if apiKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
-			rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
-			logger.Logger.Error("Failed to generate API key", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, rfc9457Err)
-			return
-		}
-
-		var isKeyUnique bool
-		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), apiKey); err != nil {
-			rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
-			logger.Logger.Error("Failed to check if generated API key is unique", zap.Error(err), zap.String("key", apiKey))
-			c.JSON(http.StatusInternalServerError, rfc9457Err)
-			return
-		}
-
-		if isKeyUnique {
-			break
-		}
+	apiKey, err := h.generateApiKey()
+	if err != nil {
+		rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+		logger.Logger.Error("Failed to generate API key", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, rfc9457Err)
+		return
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -119,4 +105,79 @@ func (h *AuthHandler) AuthenticateUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) GetAuthenticatedUser(c *gin.Context) {
+	user := h.getAuthenticatedUser(c)
+	if user == nil {
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) RefreshApiKey(c *gin.Context) {
+	user := h.getAuthenticatedUser(c)
+	if user == nil {
+		return
+	}
+
+	apiKey, err := h.generateApiKey()
+	if err != nil {
+		rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+		logger.Logger.Error("Failed to generate API key", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, rfc9457Err)
+		return
+	}
+
+	err = h.userRepo.UpdateApiKey(context.Background(), user, apiKey)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		status, message := errors.ParseDBError(err)
+		rfc9457Err := errors.FormRFC9457Error(status, c.FullPath(), message)
+		c.JSON(status, rfc9457Err)
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) getAuthenticatedUser(c *gin.Context) *domain.User {
+	userInterface, exists := c.Get("authenticatedUser")
+	if !exists || userInterface == nil {
+		rfc9457Err := errors.FormRFC9457Error(http.StatusUnauthorized, c.FullPath(), "")
+		c.JSON(http.StatusUnauthorized, rfc9457Err)
+		return nil
+	}
+
+	user, ok := userInterface.(*domain.User)
+	if !ok {
+		rfc9457Err := errors.FormRFC9457Error(http.StatusInternalServerError, c.FullPath(), "")
+		logger.Logger.Error("Was unable to cast authenticatedUser from context to *domain.User", zap.Any("user", user))
+		c.JSON(http.StatusInternalServerError, rfc9457Err)
+		return nil
+	}
+
+	return user
+}
+
+func (h *AuthHandler) generateApiKey() (string, error) {
+	var apiKey string
+	for {
+		var err error
+		if apiKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
+			return "", err
+		}
+
+		var isKeyUnique bool
+		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), apiKey); err != nil {
+			return "", err
+		}
+
+		if isKeyUnique {
+			break
+		}
+	}
+
+	return apiKey, nil
 }

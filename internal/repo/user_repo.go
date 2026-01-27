@@ -34,6 +34,10 @@ const getUserByApiKeyQuery = `
 	SELECT * FROM users WHERE api_key=$1
 `
 
+const updateApiKeyQuery = `
+	UPDATE users SET api_key=$1 WHERE id=$2 RETURNING *
+`
+
 func (r *UserRepo) CreateUser(ctx context.Context, user *domain.User) error {
 	return r.db.QueryRowxContext(ctx, createUserQuery, user.Email, user.Password, user.APIKey).
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
@@ -77,4 +81,8 @@ func (r *UserRepo) GetByApiKey(ctx context.Context, api_key string) (*domain.Use
 	}
 
 	return &user, nil
+}
+
+func (r *UserRepo) UpdateApiKey(ctx context.Context, user *domain.User, api_key string) error {
+	return r.db.GetContext(ctx, user, updateApiKeyQuery, api_key, user.ID)
 }

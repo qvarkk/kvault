@@ -25,6 +25,9 @@ func SetupRouter(repos *Repos) *gin.Engine {
 
 		authRequired := apiGroup.Group("/", middleware.AuthRequired(repos.UserRepo))
 		{
+			authRequired.GET("/auth/me", authHandler.GetAuthenticatedUser)
+			authRequired.POST("/auth/refresh", authHandler.RefreshApiKey)
+
 			authRequired.GET("/users", userHandler.GetUserByEmail) // TODO: RBAC, fix the idea that /users route only gets user by email lol
 		}
 	}

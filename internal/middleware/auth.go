@@ -28,6 +28,7 @@ func AuthRequired(userRepo *repo.UserRepo) gin.HandlerFunc {
 			return
 		}
 
+		c.Set("authenticatedUser", user)
 		c.Next()
 	}
 }

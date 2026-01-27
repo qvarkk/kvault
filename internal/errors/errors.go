@@ -44,6 +44,7 @@ func FormRFC9457Error(status int, instance string, detail string) *RFC9457Error 
 	case http.StatusConflict:
 		err.Type = "about:blank"
 		err.Title = "Conflict"
+		err.Detail = "Conflict was detected."
 	case http.StatusUnauthorized:
 		err.Type = "about:blank"
 		err.Title = "Unauthorized"
@@ -51,6 +52,7 @@ func FormRFC9457Error(status int, instance string, detail string) *RFC9457Error 
 	case http.StatusNotFound:
 		err.Type = "about:blank"
 		err.Title = "Not Found"
+		err.Detail = "The requested resourse was not found."
 	default:
 		err.Type = "about:blank"
 		err.Title = "Unknown Error"
@@ -72,7 +74,7 @@ func ParseDBError(err error) (int, string) {
 		}
 	}
 
-	return http.StatusInternalServerError, "internal database error"
+	return http.StatusInternalServerError, "Internal database error."
 }
 
 func parseUniqueConstraintMessage(constraint string) string {
