@@ -32,7 +32,7 @@ type Item struct {
 	UserID     string    `db:"user_id"`
 	Type       ItemType  `db:"type"`
 	Title      string    `db:"title"`
-	Content    string    `db:"content"`
+	Content    *string   `db:"content"`
 	FileMetaID *string   `db:"file_meta_id"`
 	CreatedAt  time.Time `db:"created_at"`
 	UpdatedAt  time.Time `db:"updated_at"`

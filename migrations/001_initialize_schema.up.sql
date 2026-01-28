@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
@@ -9,9 +9,10 @@ CREATE TABLE users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DROP TYPE IF EXISTS file_status;
 CREATE TYPE file_status AS ENUM ('uploaded', 'processing', 'ready', 'error');
 
-CREATE TABLE file_meta (
+CREATE TABLE IF NOT EXISTS file_meta (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   path TEXT NOT NULL,
   size BIGINT NOT NULL,
@@ -22,20 +23,21 @@ CREATE TABLE file_meta (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DROP TYPE IF EXISTS item_type;
 CREATE TYPE item_type AS ENUM ('text', 'file', 'url');
 
-CREATE TABLE items (
+CREATE TABLE IF NOT EXISTS items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id),
   type item_type NOT NULL,
-  title TEXT,
+  title TEXT NOT NULL,
   content TEXT,
   file_meta_id UUID REFERENCES file_meta(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     user_id UUID NOT NULL REFERENCES users(id),
@@ -44,7 +46,7 @@ CREATE TABLE tags (
     UNIQUE (user_id, name)
 );
 
-CREATE TABLE item_tags (
+CREATE TABLE IF NOT EXISTS item_tags (
     item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
     tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (item_id, tag_id)
