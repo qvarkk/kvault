@@ -108,7 +108,7 @@ func (h *AuthHandler) AuthenticateUser(c *gin.Context) {
 }
 
 func (h *AuthHandler) GetAuthenticatedUser(c *gin.Context) {
-	user := h.getAuthenticatedUser(c)
+	user := h.requireAuthenticatedUser(c)
 	if user == nil {
 		return
 	}
@@ -117,7 +117,7 @@ func (h *AuthHandler) GetAuthenticatedUser(c *gin.Context) {
 }
 
 func (h *AuthHandler) RefreshApiKey(c *gin.Context) {
-	user := h.getAuthenticatedUser(c)
+	user := h.requireAuthenticatedUser(c)
 	if user == nil {
 		return
 	}
@@ -142,7 +142,7 @@ func (h *AuthHandler) RefreshApiKey(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *AuthHandler) getAuthenticatedUser(c *gin.Context) *domain.User {
+func (h *AuthHandler) requireAuthenticatedUser(c *gin.Context) *domain.User {
 	userInterface, exists := c.Get("authenticatedUser")
 	if !exists || userInterface == nil {
 		rfc9457Err := errors.FormRFC9457Error(http.StatusUnauthorized, c.FullPath(), "")
