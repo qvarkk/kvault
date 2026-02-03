@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
@@ -45,14 +46,17 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *domain.User) error {
 
 func (r *UserRepo) IsAPIKeyUnique(ctx context.Context, APIKey string) (bool, error) {
 	var exists bool
+
+	// TODO: figure a way around repetition of this, or similar to this, fragment of code in every "get" method
 	err := r.db.Get(&exists, isAPIKeyUniqueQuery, APIKey)
-	if err == sql.ErrNoRows {
-		return true, nil
-	} else if err != nil {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return true, nil
+		}
 		return false, err
-	} else {
-		return false, nil
 	}
+
+	return false, nil
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -60,7 +64,7 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 
 	err := r.db.GetContext(ctx, &user, getUserByEmailQuery, email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -74,7 +78,7 @@ func (r *UserRepo) GetByApiKey(ctx context.Context, api_key string) (*domain.Use
 
 	err := r.db.GetContext(ctx, &user, getUserByApiKeyQuery, api_key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

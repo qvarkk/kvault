@@ -14,6 +14,7 @@ type Repos struct {
 
 func SetupRouter(repos *Repos) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.ErrorHandlingMiddleware())
 
 	userHandler := handlers.NewUserHandler(repos.UserRepo)
 	authHandler := handlers.NewAuthHandler(repos.UserRepo)

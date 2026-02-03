@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"qvarkk/kvault/internal/errors"
+	"qvarkk/kvault/internal/httpx"
 	"qvarkk/kvault/internal/repo"
 
 	"github.com/gin-gonic/gin"
@@ -20,21 +20,17 @@ func NewUserHandler(userRepo *repo.UserRepo) *UserHandler {
 func (h *UserHandler) GetUserByEmail(c *gin.Context) {
 	email := c.Query("email")
 	if email == "" {
-		rfc9457Err := errors.FormRFC9457Error(http.StatusBadRequest, c.FullPath(), "Email query parameter is required.")
-		c.JSON(http.StatusBadRequest, rfc9457Err)
+		abortWithPublicError(c, httpx.ErrBadRequest, "Email query parameter is required.")
 		return
 	}
 
 	user, err := h.userRepo.GetByEmail(context.Background(), email)
 	if err != nil {
-		status, message := errors.ParseDBError(err)
-		rfc9457Err := errors.FormRFC9457Error(status, c.FullPath(), message)
-		c.JSON(status, rfc9457Err)
+		abortOnDbError(c, err)
 		return
 	}
 	if user == nil {
-		rfc9457Err := errors.FormRFC9457Error(http.StatusNotFound, c.FullPath(), "User with this email not found.")
-		c.JSON(http.StatusNotFound, rfc9457Err)
+		abortWithPublicError(c, httpx.ErrNotFound, "User with this email not found.")
 		return
 	}
 

@@ -2,13 +2,10 @@ package middleware
 
 import (
 	"context"
-	"net/http"
-	"qvarkk/kvault/internal/errors"
+	"qvarkk/kvault/internal/httpx"
 	"qvarkk/kvault/internal/repo"
-	"qvarkk/kvault/logger"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 func AuthRequired(userRepo *repo.UserRepo) gin.HandlerFunc {
@@ -17,14 +14,17 @@ func AuthRequired(userRepo *repo.UserRepo) gin.HandlerFunc {
 
 		user, err := userRepo.GetByApiKey(context.Background(), api_key)
 		if err != nil {
-			_, message := errors.ParseDBError(err)
-			logger.Logger.Error("Failed to authorize user by API key", zap.String("message", message))
-			c.AbortWithStatus(http.StatusInternalServerError)
+			handlerErr := httpx.DBErrorToPublicError(err)
+			c.Error(handlerErr).SetType(gin.ErrorTypePublic)
+			c.Abort()
 			return
 		}
 		if user == nil {
-			rfc9457_err := errors.FormRFC9457Error(http.StatusUnauthorized, c.FullPath(), "")
-			c.AbortWithStatusJSON(http.StatusUnauthorized, rfc9457_err)
+			handlerErr := &httpx.PublicError{
+				Err: httpx.ErrUnauthorized,
+			}
+			c.Error(handlerErr).SetType(gin.ErrorTypePublic)
+			c.Abort()
 			return
 		}
 
