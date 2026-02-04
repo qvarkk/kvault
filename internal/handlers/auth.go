@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"qvarkk/kvault/internal/apikey"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repo"
-	"qvarkk/kvault/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -124,13 +124,10 @@ func (h *AuthHandler) RefreshApiKey(c *gin.Context) {
 func (h *AuthHandler) generateApiKey() (string, error) {
 	var apiKey string
 	for {
-		var err error
-		if apiKey, err = utils.GenerateAPIKey(utils.APIKeyLength); err != nil {
-			return "", err
-		}
+		apiKey = apikey.GenerateAPIKey()
 
-		var isKeyUnique bool
-		if isKeyUnique, err = h.userRepo.IsAPIKeyUnique(context.Background(), apiKey); err != nil {
+		isKeyUnique, err := h.userRepo.IsAPIKeyUnique(context.Background(), apiKey)
+		if err != nil {
 			return "", err
 		}
 
