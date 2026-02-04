@@ -12,12 +12,16 @@ type Repos struct {
 	UserRepo *repo.UserRepo
 }
 
-func SetupRouter(repos *Repos) *gin.Engine {
+type Services struct {
+	AuthService handlers.AuthService
+}
+
+func SetupRouter(repos *Repos, services *Services) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.ErrorHandlingMiddleware())
 
 	userHandler := handlers.NewUserHandler(repos.UserRepo)
-	authHandler := handlers.NewAuthHandler(repos.UserRepo)
+	authHandler := handlers.NewAuthHandler(services.AuthService)
 
 	apiGroup := r.Group("/api")
 	{
@@ -27,9 +31,10 @@ func SetupRouter(repos *Repos) *gin.Engine {
 		authRequired := apiGroup.Group("/", middleware.AuthRequired(repos.UserRepo))
 		{
 			authRequired.GET("/auth/me", authHandler.GetAuthenticatedUser)
-			authRequired.POST("/auth/refresh", authHandler.RefreshApiKey)
+			authRequired.POST("/auth/refresh", authHandler.RotateApiKey)
 
-			authRequired.GET("/users", userHandler.GetUserByEmail) // TODO: RBAC, fix the idea that /users route only gets user by email lol
+			// TODO: RBAC, fix the idea that /users route only gets user by email lol
+			authRequired.GET("/users", userHandler.GetUserByEmail)
 		}
 	}
 

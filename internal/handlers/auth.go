@@ -2,17 +2,24 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
-	"qvarkk/kvault/internal/apikey"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 )
 
+type AuthService interface {
+	GenerateApiKey(context.Context) (string, error)
+	RegisterNewUser(ctx context.Context, email string, password string) (*domain.User, error)
+	VerifyCredentials(ctx context.Context, email string, password string) (*domain.User, error)
+	GetUserByID(ctx context.Context, userID string) (*domain.User, error)
+	RotateApiKey(ctx context.Context, userID string) (*domain.User, error)
+}
+
 type AuthHandler struct {
-	userRepo *repo.UserRepo
+	authService AuthService
 }
 
 type registerUserRequest struct {
@@ -25,116 +32,67 @@ type authenticateUserRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-func NewAuthHandler(userRepo *repo.UserRepo) *AuthHandler {
-	return &AuthHandler{userRepo: userRepo}
+func NewAuthHandler(authService AuthService) *AuthHandler {
+	return &AuthHandler{
+		authService: authService,
+	}
 }
 
-func (h *AuthHandler) RegisterUser(c *gin.Context) {
+func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
 	var req registerUserRequest
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(c, err)
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		abortOnBindError(ctx, err)
 		return
 	}
 
-	apiKey, err := h.generateApiKey()
-	if err != nil {
-		abortOnInternalError(c, err)
+	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Email, req.Password)
+	if errors.Is(err, services.ErrDatabase) {
+		abortOnDbError(ctx, err)
+		return
+	} else if errors.Is(err, services.ErrInternal) {
+		abortOnInternalError(ctx, err)
 		return
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		abortOnInternalError(c, err)
-		return
-	}
-
-	user := domain.User{
-		Email:    req.Email,
-		Password: string(passwordHash),
-		APIKey:   apiKey,
-	}
-
-	err = h.userRepo.CreateUser(context.Background(), &user)
-	if err != nil {
-		abortOnDbError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusCreated, user)
+	ctx.JSON(http.StatusCreated, toUserResponse(user))
 }
 
-func (h *AuthHandler) AuthenticateUser(c *gin.Context) {
+func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
 	var req authenticateUserRequest
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(c, err)
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		abortOnBindError(ctx, err)
 		return
 	}
 
-	user, err := h.userRepo.GetByEmail(context.Background(), req.Email)
+	user, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		abortOnDbError(c, err)
-		return
-	}
-	if user == nil {
-		abortUnauthorized(c)
+		abortUnauthorized(ctx)
 		return
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
-	if err != nil {
-		abortUnauthorized(c)
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
+	ctx.JSON(http.StatusOK, toUserResponse(user))
 }
 
-func (h *AuthHandler) GetAuthenticatedUser(c *gin.Context) {
-	user := requireAuthenticatedUser(c)
-	if user == nil {
-		abortUnauthorized(c)
+func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
+	userID := ctx.MustGet("userID").(string)
+
+	user, err := h.authService.GetUserByID(ctx.Request.Context(), userID)
+	if err != nil {
+		abortOnInternalError(ctx, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	ctx.JSON(http.StatusOK, toUserResponse(user))
 }
 
-func (h *AuthHandler) RefreshApiKey(c *gin.Context) {
-	user := requireAuthenticatedUser(c)
-	if user == nil {
-		abortUnauthorized(c)
-		return
-	}
+func (h *AuthHandler) RotateApiKey(ctx *gin.Context) {
+	userID := ctx.MustGet("userID").(string)
 
-	apiKey, err := h.generateApiKey()
+	user, err := h.authService.RotateApiKey(ctx, userID)
 	if err != nil {
-		abortOnInternalError(c, err)
+		abortOnInternalError(ctx, err)
 		return
 	}
 
-	err = h.userRepo.UpdateApiKey(context.Background(), user, apiKey)
-	if err != nil {
-		abortOnDbError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
-func (h *AuthHandler) generateApiKey() (string, error) {
-	var apiKey string
-	for {
-		apiKey = apikey.GenerateAPIKey()
-
-		isKeyUnique, err := h.userRepo.IsAPIKeyUnique(context.Background(), apiKey)
-		if err != nil {
-			return "", err
-		}
-
-		if isKeyUnique {
-			break
-		}
-	}
-
-	return apiKey, nil
+	ctx.JSON(http.StatusOK, toUserResponse(user))
 }

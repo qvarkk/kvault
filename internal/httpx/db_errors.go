@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/lib/pq"
 )
@@ -13,6 +14,7 @@ const (
 // TODO: somehow log unrecognized errors pleeeease
 func DBErrorToPublicError(err error) *PublicError {
 	var pqErr *pq.Error
+	fmt.Printf("%s", err.Error())
 	if errors.As(err, &pqErr) {
 		switch pqErr.Code.Name() {
 		case NameUniqueViolation:

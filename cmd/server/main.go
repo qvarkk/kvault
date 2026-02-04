@@ -8,6 +8,7 @@ import (
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/repo"
 	"qvarkk/kvault/internal/routes"
+	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/logger"
 	"time"
 
@@ -50,6 +51,10 @@ func main() {
 		UserRepo: repo.NewUserRepo(pg.GetDB()),
 	}
 
-	r := routes.SetupRouter(repos)
+	services := &routes.Services{
+		AuthService: services.NewAuthService(repos.UserRepo),
+	}
+
+	r := routes.SetupRouter(repos, services)
 	r.Run()
 }
