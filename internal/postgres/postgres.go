@@ -37,10 +37,6 @@ func NewPostgres(config Config) (*Postgres, error) {
 	return &Postgres{DB: db}, nil
 }
 
-func (p *Postgres) GetDB() *sqlx.DB {
-	return p.DB
-}
-
 func (p *Postgres) Close() error {
 	return p.DB.Close()
 }

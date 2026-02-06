@@ -6,7 +6,7 @@ import (
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/migrations"
 	"qvarkk/kvault/internal/postgres"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/routes"
 	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/logger"
@@ -42,13 +42,13 @@ func main() {
 	}
 	defer pg.Close()
 
-	err = migrations.RunMigrations(pg.GetDB().DB, config.DBDatabase, "file://migrations")
+	err = migrations.RunMigrations(pg.DB.DB, config.DBDatabase, "file://migrations")
 	if err != nil {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
 	}
 
 	var (
-		userRepo = repo.NewUserRepo(pg.GetDB())
+		userRepo = repositories.NewUserRepo(pg.DB)
 	)
 
 	var (
@@ -64,5 +64,5 @@ func main() {
 	}
 
 	r := routes.SetupRouter(services)
-	r.Run()
+	r.Run(fmt.Sprintf(":%d", config.ServerPort))
 }

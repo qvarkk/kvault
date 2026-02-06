@@ -36,8 +36,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 
 		privateErr := c.Errors.ByType(gin.ErrorTypePrivate)
 		for _, err := range privateErr {
-			// TODO: add more information about request to private errors logged
-			// 			 also might be a good idea to bring in something like sentry
+			// TODO: might be a good idea to bring in something like sentry
 			logger.Logger.Error("private error",
 				zap.String("path", c.FullPath()),
 				zap.String("client_ip", c.ClientIP()),

@@ -17,7 +17,8 @@ func RunMigrations(db *sql.DB, dbName string, migrationsPath string) error {
 
 	m, err := migrate.NewWithDatabaseInstance(
 		migrationsPath,
-		dbName, driver)
+		dbName, driver,
+	)
 	if err != nil {
 		return err
 	}
@@ -25,8 +26,6 @@ func RunMigrations(db *sql.DB, dbName string, migrationsPath string) error {
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
 		return err
-	} else if err == migrate.ErrNoChange {
-		logger.Logger.Info("no migrations to do")
 	} else {
 		logger.Logger.Info("migrations applied successfully")
 	}

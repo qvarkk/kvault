@@ -4,16 +4,16 @@ import (
 	"context"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/repositories"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ItemHandler struct {
-	itemRepo *repo.ItemRepo
+	itemRepo *repositories.ItemRepo
 }
 
-func NewItemHandler(itemRepo *repo.ItemRepo) *ItemHandler {
+func NewItemHandler(itemRepo *repositories.ItemRepo) *ItemHandler {
 	return &ItemHandler{itemRepo: itemRepo}
 }
 

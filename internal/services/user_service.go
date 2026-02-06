@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/repositories"
 )
 
 type UserRepo interface {
@@ -23,32 +23,32 @@ func NewUserService(userRepo UserRepo) *UserService {
 }
 
 func (u *UserService) GetByID(ctx context.Context, userID string) (*domain.User, error) {
-	return u.getByField(ctx, repo.UserFieldID, userID)
+	return u.getByField(ctx, repositories.UserFieldID, userID)
 }
 
 func (u *UserService) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return u.getByField(ctx, repo.UserFieldEmail, email)
+	return u.getByField(ctx, repositories.UserFieldEmail, email)
 }
 
 func (u *UserService) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {
-	return u.getByField(ctx, repo.UserFieldApiKey, apiKey)
+	return u.getByField(ctx, repositories.UserFieldApiKey, apiKey)
 }
 
 func (u *UserService) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
 	var user *domain.User
 	var err error
 	switch field {
-	case repo.UserFieldID:
+	case repositories.UserFieldID:
 		user, err = u.userRepo.GetByID(ctx, value)
-	case repo.UserFieldEmail:
+	case repositories.UserFieldEmail:
 		user, err = u.userRepo.GetByEmail(ctx, value)
-	case repo.UserFieldApiKey:
+	case repositories.UserFieldApiKey:
 		user, err = u.userRepo.GetByApiKey(ctx, value)
 	}
 
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to find user with %s = %s", field, value)
-		if errors.Is(err, repo.ErrNotFound) {
+		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, NewServiceError(ErrUserNotFound, errMsg, err)
 		}
 		return nil, NewServiceError(ErrInternal, errMsg, err)

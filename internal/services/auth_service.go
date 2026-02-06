@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/repositories"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -83,7 +83,7 @@ func (a *AuthService) VerifyCredentials(
 	user, err := a.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to find user %s", email)
-		if errors.Is(err, repo.ErrNotFound) {
+		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, NewServiceError(ErrUserNotFound, errMsg, err)
 		}
 		return nil, NewServiceError(ErrInternal, errMsg, err)

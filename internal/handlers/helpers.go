@@ -9,6 +9,8 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// TODO: fix those methods, they're chopped
+
 func abortOnBindError(ctx *gin.Context, err error) {
 	var publicErr *httpx.PublicError
 

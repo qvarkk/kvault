@@ -3,15 +3,16 @@ package httpx
 import (
 	"errors"
 	"fmt"
+	"qvarkk/kvault/logger"
 
 	"github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 const (
 	NameUniqueViolation = "unique_violation"
 )
 
-// TODO: somehow log unrecognized errors pleeeease
 func DBErrorToPublicError(err error) *PublicError {
 	var pqErr *pq.Error
 	fmt.Printf("%s", err.Error())
@@ -25,6 +26,7 @@ func DBErrorToPublicError(err error) *PublicError {
 		}
 	}
 
+	logger.Logger.Info("unrecognized DB error was caught", zap.Error(err))
 	return &PublicError{
 		Err: ErrInternalServer,
 	}

@@ -19,12 +19,12 @@ const (
 )
 
 type User struct {
-	ID        string    `db:"id" json:"id"`
-	Email     string    `db:"email" json:"email"`
-	Password  string    `db:"password" json:"-"`
-	APIKey    string    `db:"api_key" json:"api_key"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+	ID        string    `db:"id"`
+	Email     string    `db:"email"`
+	Password  string    `db:"password"`
+	APIKey    string    `db:"api_key"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 type Item struct {
