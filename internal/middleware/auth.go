@@ -2,33 +2,39 @@ package middleware
 
 import (
 	"context"
+	"errors"
+	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/httpx"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRequired(userRepo *repo.UserRepo) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		api_key := c.GetHeader("Authorization")
+type UserService interface {
+	GetByApiKey(context.Context, string) (*domain.User, error)
+}
 
-		user, err := userRepo.GetByApiKey(context.Background(), api_key)
+func AuthRequired(userService UserService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		api_key := ctx.GetHeader("Authorization")
+
+		user, err := userService.GetByApiKey(ctx.Request.Context(), api_key)
 		if err != nil {
-			handlerErr := httpx.DBErrorToPublicError(err)
-			c.Error(handlerErr).SetType(gin.ErrorTypePublic)
-			c.Abort()
-			return
-		}
-		if user == nil {
-			handlerErr := &httpx.PublicError{
-				Err: httpx.ErrUnauthorized,
+			if errors.Is(err, services.ErrUserNotFound) {
+				handlerErr := &httpx.PublicError{
+					Err: httpx.ErrUnauthorized,
+				}
+				ctx.Error(handlerErr).SetType(gin.ErrorTypePublic)
+				ctx.Abort()
+				return
 			}
-			c.Error(handlerErr).SetType(gin.ErrorTypePublic)
-			c.Abort()
+			handlerErr := httpx.DBErrorToPublicError(err)
+			ctx.Error(handlerErr).SetType(gin.ErrorTypePublic)
+			ctx.Abort()
 			return
 		}
 
-		c.Set("userID", user.ID)
-		c.Next()
+		ctx.Set("userID", user.ID)
+		ctx.Next()
 	}
 }

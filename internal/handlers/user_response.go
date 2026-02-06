@@ -16,6 +16,14 @@ func toUserResponse(user *domain.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
 		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func toUserResponseWithApiKey(user *domain.User) UserResponse {
+	return UserResponse{
+		ID:        user.ID,
+		Email:     user.Email,
 		APIKey:    user.APIKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 	}

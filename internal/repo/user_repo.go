@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	FieldID     = "id"
-	FieldEmail  = "email"
-	FieldApiKey = "api_key"
+	UserFieldID     = "id"
+	UserFieldEmail  = "email"
+	UserFieldApiKey = "api_key"
 )
 
 const createUserQuery = `
@@ -54,31 +54,27 @@ func (r *UserRepo) CreateNew(ctx context.Context, user *domain.User) error {
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
-func (r *UserRepo) IsAPIKeyUnique(ctx context.Context, apiKey string) (bool, error) {
+func (r *UserRepo) IsApiKeyUnique(ctx context.Context, apiKey string) (bool, error) {
 	var exists bool
 
-	// TODO: figure a way around repetition of this, or similar to this, fragment of code in every "get" method
 	err := r.db.Get(&exists, isApiKeyUniqueQuery, apiKey)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return true, nil
-		}
-		return false, err
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
 	}
 
-	return false, nil
+	return false, err
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, userID string) (*domain.User, error) {
-	return r.getByField(ctx, FieldID, userID)
+	return r.getByField(ctx, UserFieldID, userID)
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.getByField(ctx, FieldEmail, email)
+	return r.getByField(ctx, UserFieldEmail, email)
 }
 
 func (r *UserRepo) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {
-	return r.getByField(ctx, FieldApiKey, apiKey)
+	return r.getByField(ctx, UserFieldApiKey, apiKey)
 }
 
 // Updates API key and returns updated user
@@ -91,11 +87,11 @@ func (r *UserRepo) UpdateApiKey(ctx context.Context, userID string, apiKey strin
 func (r *UserRepo) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
 	var query string
 	switch field {
-	case FieldID:
+	case UserFieldID:
 		query = getUserByIDQuery
-	case FieldEmail:
+	case UserFieldEmail:
 		query = getUserByEmailQuery
-	case FieldApiKey:
+	case UserFieldApiKey:
 		query = getUserByApiKeyQuery
 	}
 
@@ -103,7 +99,7 @@ func (r *UserRepo) getByField(ctx context.Context, field string, value string) (
 	err := r.db.GetContext(ctx, &user, query, value)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

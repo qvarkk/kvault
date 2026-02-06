@@ -2,37 +2,43 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/httpx"
-	"qvarkk/kvault/internal/repo"
+	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
+type UserService interface {
+	GetByEmail(context.Context, string) (*domain.User, error)
+}
+
 type UserHandler struct {
-	userRepo *repo.UserRepo
+	userService UserService
 }
 
-func NewUserHandler(userRepo *repo.UserRepo) *UserHandler {
-	return &UserHandler{userRepo: userRepo}
+func NewUserHandler(userService UserService) *UserHandler {
+	return &UserHandler{userService: userService}
 }
 
-func (h *UserHandler) GetUserByEmail(c *gin.Context) {
-	email := c.Query("email")
+func (h *UserHandler) GetByEmail(ctx *gin.Context) {
+	email := ctx.Query("email")
 	if email == "" {
-		abortWithPublicError(c, httpx.ErrBadRequest, "Email query parameter is required.")
+		abortWithPublicError(ctx, httpx.ErrBadRequest, "Email query parameter is required.")
 		return
 	}
 
-	user, err := h.userRepo.GetByEmail(context.Background(), email)
+	user, err := h.userService.GetByEmail(ctx.Request.Context(), email)
 	if err != nil {
-		abortOnDbError(c, err)
-		return
-	}
-	if user == nil {
-		abortWithPublicError(c, httpx.ErrNotFound, "User with this email not found.")
+		if errors.Is(err, services.ErrUserNotFound) {
+			abortWithPublicError(ctx, httpx.ErrNotFound, "User with this email not found.")
+			return
+		}
+		abortOnDbError(ctx, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	ctx.JSON(http.StatusOK, toUserResponse(user))
 }

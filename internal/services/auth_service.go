@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repo"
@@ -10,20 +11,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserRepo interface {
+type AuthUserRepo interface {
 	CreateNew(context.Context, *domain.User) error
-	GetById(context.Context, string) (*domain.User, error)
+	GetByID(context.Context, string) (*domain.User, error)
 	GetByEmail(context.Context, string) (*domain.User, error)
-	GetByApiKey(context.Context, string) (*domain.User, error)
 	UpdateApiKey(ctx context.Context, userID string, apiKey string) (*domain.User, error)
 	IsApiKeyUnique(context.Context, string) (bool, error)
 }
 
 type AuthService struct {
-	userRepo *repo.UserRepo
+	userRepo AuthUserRepo
 }
 
-func NewAuthService(userRepo *repo.UserRepo) *AuthService {
+func NewAuthService(userRepo AuthUserRepo) *AuthService {
 	return &AuthService{userRepo: userRepo}
 }
 
@@ -32,12 +32,10 @@ func (a *AuthService) GenerateApiKey(ctx context.Context) (string, error) {
 	for {
 		apiKey = GenerateUuidV4()
 
-		isKeyUnique, err := a.userRepo.IsAPIKeyUnique(ctx, apiKey)
+		isKeyUnique, err := a.userRepo.IsApiKeyUnique(ctx, apiKey)
 		if err != nil {
-			return "", fmt.Errorf(
-				"couldn't verify if api key %s is unique: %w",
-				apiKey, wrapInternalError(err),
-			)
+			errMsg := fmt.Sprintf("couldn't verify if api key %s is unique", apiKey)
+			return "", NewServiceError(ErrInternal, errMsg, err)
 		}
 
 		if isKeyUnique {
@@ -55,12 +53,12 @@ func (a *AuthService) RegisterNewUser(
 ) (*domain.User, error) {
 	apiKey, err := a.GenerateApiKey(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate api key: %w", wrapInternalError(err))
+		return nil, NewServiceError(ErrInternal, "failed to generate api key", err)
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", wrapInternalError(err))
+		return nil, NewServiceError(ErrInternal, "failed to hash password", err)
 	}
 
 	user := &domain.User{
@@ -71,7 +69,7 @@ func (a *AuthService) RegisterNewUser(
 
 	err = a.userRepo.CreateNew(ctx, user)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", wrapDatabaseError(err))
+		return nil, NewServiceError(ErrUserNotCreated, "failed to create user", err)
 	}
 
 	return user, nil
@@ -83,13 +81,17 @@ func (a *AuthService) VerifyCredentials(
 	password string,
 ) (*domain.User, error) {
 	user, err := a.userRepo.GetByEmail(ctx, email)
-	if err != nil || user == nil {
-		return nil, fmt.Errorf("failed to find user %s: %w", email, wrapInternalError(err))
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to find user %s", email)
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, NewServiceError(ErrUserNotFound, errMsg, err)
+		}
+		return nil, NewServiceError(ErrInternal, errMsg, err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, fmt.Errorf("failed to compare password hashes: %w", wrapInternalError(err))
+		return nil, NewServiceError(ErrInternal, "failed to compare password hashes", err)
 	}
 
 	return user, nil
@@ -101,22 +103,16 @@ func (a *AuthService) RotateApiKey(
 ) (*domain.User, error) {
 	apiKey, err := a.GenerateApiKey(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate api key: %w", wrapInternalError(err))
+		return nil, NewServiceError(ErrInternal, "failed to generate api key", err)
 	}
 
 	user, err := a.userRepo.UpdateApiKey(ctx, userID, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to update api key. ID: %s. Key: %s. Err: %w",
-			userID, apiKey, wrapInternalError(err),
-		)
+		errMsg := fmt.Sprintf("failed to update api key. ID: %s; key: %s", userID, apiKey)
+		return nil, NewServiceError(ErrInternal, errMsg, err)
 	}
 
 	return user, nil
-}
-
-func (a *AuthService) GetUserByID(ctx context.Context, userID string) (*domain.User, error) {
-	return a.userRepo.GetByID(ctx, userID)
 }
 
 func GenerateUuidV4() string {

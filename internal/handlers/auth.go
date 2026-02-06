@@ -14,12 +14,16 @@ type AuthService interface {
 	GenerateApiKey(context.Context) (string, error)
 	RegisterNewUser(ctx context.Context, email string, password string) (*domain.User, error)
 	VerifyCredentials(ctx context.Context, email string, password string) (*domain.User, error)
-	GetUserByID(ctx context.Context, userID string) (*domain.User, error)
 	RotateApiKey(ctx context.Context, userID string) (*domain.User, error)
+}
+
+type AuthUserService interface {
+	GetByID(context.Context, string) (*domain.User, error)
 }
 
 type AuthHandler struct {
 	authService AuthService
+	userService AuthUserService
 }
 
 type registerUserRequest struct {
@@ -32,9 +36,10 @@ type authenticateUserRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-func NewAuthHandler(authService AuthService) *AuthHandler {
+func NewAuthHandler(authService AuthService, userService AuthUserService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		userService: userService,
 	}
 }
 
@@ -46,7 +51,7 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
 	}
 
 	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Email, req.Password)
-	if errors.Is(err, services.ErrDatabase) {
+	if errors.Is(err, services.ErrUserNotCreated) {
 		abortOnDbError(ctx, err)
 		return
 	} else if errors.Is(err, services.ErrInternal) {
@@ -54,7 +59,7 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, toUserResponse(user))
+	ctx.JSON(http.StatusCreated, toUserResponseWithApiKey(user))
 }
 
 func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
@@ -70,19 +75,19 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponse(user))
+	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
 }
 
 func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
 	userID := ctx.MustGet("userID").(string)
 
-	user, err := h.authService.GetUserByID(ctx.Request.Context(), userID)
+	user, err := h.userService.GetByID(ctx.Request.Context(), userID)
 	if err != nil {
 		abortOnInternalError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponse(user))
+	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
 }
 
 func (h *AuthHandler) RotateApiKey(ctx *gin.Context) {
@@ -94,5 +99,5 @@ func (h *AuthHandler) RotateApiKey(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponse(user))
+	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
 }

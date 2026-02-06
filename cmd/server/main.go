@@ -47,14 +47,22 @@ func main() {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
 	}
 
-	repos := &routes.Repos{
-		UserRepo: repo.NewUserRepo(pg.GetDB()),
-	}
+	var (
+		userRepo = repo.NewUserRepo(pg.GetDB())
+	)
+
+	var (
+		authService = services.NewAuthService(userRepo)
+		userService = services.NewUserService(userRepo)
+	)
 
 	services := &routes.Services{
-		AuthService: services.NewAuthService(repos.UserRepo),
+		AuthService:     authService,
+		AuthUserService: userService,
+		MwUserService:   userService,
+		UserService:     userService,
 	}
 
-	r := routes.SetupRouter(repos, services)
+	r := routes.SetupRouter(services)
 	r.Run()
 }
