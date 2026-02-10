@@ -49,11 +49,13 @@ func main() {
 
 	var (
 		userRepo = repositories.NewUserRepo(pg.DB)
+		itemRepo = repositories.NewItemRepo(pg.DB)
 	)
 
 	var (
 		authService = services.NewAuthService(userRepo)
 		userService = services.NewUserService(userRepo)
+		itemService = services.NewItemService(itemRepo)
 	)
 
 	services := &routes.Services{
@@ -61,6 +63,7 @@ func main() {
 		AuthUserService: userService,
 		MwUserService:   userService,
 		UserService:     userService,
+		ItemService:     itemService,
 	}
 
 	r := routes.SetupRouter(services)

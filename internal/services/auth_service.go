@@ -69,7 +69,7 @@ func (a *AuthService) RegisterNewUser(
 
 	err = a.userRepo.CreateNew(ctx, user)
 	if err != nil {
-		return nil, NewServiceError(ErrUserNotCreated, "failed to create user", err)
+		return nil, NewServiceError(ErrUserNotCreated, "database error", err)
 	}
 
 	return user, nil

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type FileStatus string
 type ItemType string
@@ -28,25 +31,25 @@ type User struct {
 }
 
 type Item struct {
-	ID         string    `db:"id"`
-	UserID     string    `db:"user_id"`
-	Type       ItemType  `db:"type"`
-	Title      string    `db:"title"`
-	Content    *string   `db:"content"`
-	FileMetaID *string   `db:"file_meta_id"`
-	CreatedAt  time.Time `db:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at"`
+	ID         string         `db:"id"`
+	UserID     string         `db:"user_id"`
+	Type       ItemType       `db:"type"`
+	Title      string         `db:"title"`
+	Content    sql.NullString `db:"content"`
+	FileMetaID sql.NullString `db:"file_meta_id"`
+	CreatedAt  time.Time      `db:"created_at"`
+	UpdatedAt  time.Time      `db:"updated_at"`
 }
 
 type FileMeta struct {
-	ID        string     `db:"id"`
-	Path      string     `db:"path"`
-	Size      int64      `db:"size"`
-	MimeType  string     `db:"mime_type"`
-	Hash      *string    `db:"hash"`
-	Status    FileStatus `db:"status"`
-	CreatedAt time.Time  `db:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at"`
+	ID        string         `db:"id"`
+	Path      string         `db:"path"`
+	Size      int64          `db:"size"`
+	MimeType  string         `db:"mime_type"`
+	Hash      sql.NullString `db:"hash"`
+	Status    FileStatus     `db:"status"`
+	CreatedAt time.Time      `db:"created_at"`
+	UpdatedAt time.Time      `db:"updated_at"`
 }
 
 type Tag struct {

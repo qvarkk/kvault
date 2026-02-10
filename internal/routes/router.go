@@ -12,14 +12,16 @@ type Services struct {
 	AuthUserService handlers.AuthUserService
 	MwUserService   middleware.UserService
 	UserService     handlers.UserService
+	ItemService     handlers.ItemService
 }
 
 func SetupRouter(services *Services) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.ErrorHandlingMiddleware())
 
-	userHandler := handlers.NewUserHandler(services.UserService)
 	authHandler := handlers.NewAuthHandler(services.AuthService, services.AuthUserService)
+	userHandler := handlers.NewUserHandler(services.UserService)
+	itemHandler := handlers.NewItemHandler(services.ItemService)
 
 	apiGroup := r.Group("/api")
 	{
@@ -33,6 +35,8 @@ func SetupRouter(services *Services) *gin.Engine {
 
 			// TODO: RBAC, fix the idea that /users route only gets user by email lol
 			authRequired.GET("/users", userHandler.GetByEmail)
+
+			authRequired.POST("/items", itemHandler.Create)
 		}
 	}
 

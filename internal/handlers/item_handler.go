@@ -2,47 +2,58 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repositories"
+	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-type ItemHandler struct {
-	itemRepo *repositories.ItemRepo
+type ItemService interface {
+	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
 }
 
-func NewItemHandler(itemRepo *repositories.ItemRepo) *ItemHandler {
-	return &ItemHandler{itemRepo: itemRepo}
+type ItemHandler struct {
+	itemService ItemService
+}
+
+func NewItemHandler(itemService ItemService) *ItemHandler {
+	return &ItemHandler{itemService: itemService}
 }
 
 type createItemRequest struct {
 	Type       string `json:"type" binding:"required,oneof=text file url"`
 	Title      string `json:"title" binding:"required"`
 	Content    string `json:"content"`
-	FileMetaID string `json:"file_meta_id" binding:"uuid4"`
+	FileMetaID string `json:"file_meta_id" binding:"omitempty,uuid4"`
 }
 
-func (h *ItemHandler) CreateItem(c *gin.Context) {
+func (h *ItemHandler) Create(ctx *gin.Context) {
+	userID := ctx.MustGet("userID").(string)
+
 	var req createItemRequest
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(c, err)
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		abortOnBindError(ctx, err)
 		return
 	}
 
-	item := domain.Item{
-		Type:       domain.ItemType(req.Type),
+	itemInput := services.CreateItemInput{
+		UserID:     userID,
+		Type:       req.Type,
 		Title:      req.Title,
-		Content:    &req.Content,
-		FileMetaID: &req.FileMetaID,
+		Content:    req.Content,
+		FileMetaID: req.FileMetaID,
 	}
 
-	err := h.itemRepo.CreateItem(context.Background(), &item)
-	if err != nil {
-		abortOnDbError(c, err)
+	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
+	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
+		abortOnDbError(ctx, err)
+		return
+	} else if errors.Is(err, services.ErrInternal) {
+		abortOnInternalError(ctx, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, item)
+	ctx.JSON(http.StatusCreated, toItemResponse(item))
 }
