@@ -1,31 +1,45 @@
 package config
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
+	"github.com/joho/godotenv"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type Config struct {
-	ServerPort	int			`json:"server_port"`
-	DBHost			string	`json:"db_host"`
-	DBPort			int			`json:"db_port"`
-	DBDatabase	string	`json:"db_database"`
-	DBUsername	string	`json:"db_username"`
-	DBPassword	string	`json:"db_password"`
+	Debug bool `default:"false"`
+
+	Api   ApiConfig
+	DB    DBConfig
+	Redis RedisConfig
+}
+
+type ApiConfig struct {
+	Port int `envconfig:"PORT" default:"8080"`
+}
+
+type DBConfig struct {
+	Host     string `required:"true"`
+	Port     int    `default:"5432"`
+	Database string `required:"true"`
+	Username string `required:"true"`
+	Password string `required:"true"`
+}
+
+type RedisConfig struct {
+	Host     string `default:"localhost"`
+	Port     int    `default:"6379"`
+	User     string `required:"true"`
+	Password string `required:"true"`
 }
 
 func LoadConfig() (*Config, error) {
-	configPath := filepath.Join("config", "config.json")
-	file, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+	_ = godotenv.Load()
 
-	var config Config
-	if err := json.NewDecoder(file).Decode(&config); err != nil {
+	var cfg Config
+
+	if err := envconfig.Process("", &cfg); err != nil {
 		return nil, err
 	}
-	return &config, nil
+
+	return &cfg, nil
 }

@@ -15,20 +15,18 @@ import (
 	"go.uber.org/zap"
 )
 
-var DEBUG bool = true
-
 func main() {
-	err := logger.Init(DEBUG)
+	config, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	err = logger.Init(config.Debug)
 	if err != nil {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
 
-	config, err := config.LoadConfig()
-	if err != nil {
-		logger.Logger.Fatal("Failed to load config", zap.Error(err))
-	}
-
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", config.DBUsername, config.DBPassword, config.DBHost, config.DBPort, config.DBDatabase)
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", config.DB.Username, config.DB.Password, config.DB.Host, config.DB.Port, config.DB.Database)
 	pgConfig := postgres.Config{
 		DSN:             dsn,
 		MaxOpenConns:    10,
@@ -42,7 +40,7 @@ func main() {
 	}
 	defer pg.Close()
 
-	err = migrations.RunMigrations(pg.DB.DB, config.DBDatabase, "file://migrations")
+	err = migrations.RunMigrations(pg.DB.DB, config.DB.Database, "file://migrations")
 	if err != nil {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
 	}
@@ -67,5 +65,5 @@ func main() {
 	}
 
 	r := routes.SetupRouter(services)
-	r.Run(fmt.Sprintf(":%d", config.ServerPort))
+	r.Run(fmt.Sprintf(":%d", config.Api.Port))
 }
