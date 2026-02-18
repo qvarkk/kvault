@@ -26,7 +26,7 @@ func RunMigrations(db *sql.DB, dbName string, migrationsPath string) error {
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
 		return err
-	} else {
+	} else if err != migrate.ErrNoChange {
 		logger.Logger.Info("migrations applied successfully")
 	}
 
