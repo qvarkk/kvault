@@ -6,6 +6,7 @@ import (
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/migrations"
 	"qvarkk/kvault/internal/postgres"
+	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/routes"
 	"qvarkk/kvault/internal/services"
@@ -43,6 +44,18 @@ func main() {
 	err = migrations.RunMigrations(pg.DB.DB, config.DB.Database, "file://migrations")
 	if err != nil {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
+	}
+
+	redisConfig := redis.Config{
+		Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+		DB:       0,
+	}
+
+	_, err = redis.NewRedis(redisConfig)
+	if err != nil {
+		logger.Logger.Fatal("Connection to Redis failed", zap.Error(err))
 	}
 
 	var (
