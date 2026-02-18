@@ -41,7 +41,7 @@ func main() {
 	}
 	defer pg.Close()
 
-	err = migrations.RunMigrations(pg.DB.DB, config.DB.Database, "file://migrations")
+	err = migrations.RunMigrations(pg.DB.DB, config.DB.Database)
 	if err != nil {
 		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
 	}

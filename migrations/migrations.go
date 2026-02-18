@@ -13,7 +13,7 @@ import (
 //go:embed *.sql
 var migrationsFS embed.FS
 
-func RunMigrations(db *sql.DB, dbName string, migrationsPath string) error {
+func RunMigrations(db *sql.DB, dbName string) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
 		return err
