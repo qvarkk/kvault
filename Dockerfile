@@ -21,7 +21,6 @@ FROM alpine:3.21 AS final
 WORKDIR /app
 
 COPY --from=builder /app/api .
-COPY --from=builder /app/migrations ./migrations
 
 EXPOSE $API_PORT
 
