@@ -8,6 +8,8 @@ services:
     depends_on:
       pg:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
     container_name: kvault_api
 
 
@@ -29,8 +31,8 @@ services:
     volumes:
       - ./tmp/postgresql:/var/lib/postgresql/18/docker
     environment:
-      POSTGRES_DB: kvault
-      POSTGRES_PASSWORD: postgres
+      - POSTGRES_DB=${DB_DATABASE}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "${DB_PORT}:5432"
     healthcheck:
@@ -39,3 +41,27 @@ services:
       timeout: 5s
       retries: 5
     container_name: kvault_pg
+  
+  localstack:
+    build: ./docker/localstack
+    volumes:
+      - "./docker/localstack/init-terraform.sh:/etc/localstack/init/ready.d/init-terraform.sh"
+      - "./docker/localstack/terraform:/app/terraform:ro"
+      - "./tmp/terraform:/app/terraform-state"
+      - "./tmp/localstack:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - DEBUG=${DEBUG:-0}
+      - TF_VAR_access_key=${AWS_ACCESS_KEY_ID:-test}
+      - TF_VAR_secret_key=${AWS_SECRET_ACCESS_KEY:-test}
+      - TF_VAR_default_region=${AWS_DEFAULT_REGION:-eu-central-1}
+      - TF_VAR_s3_endpoint=${AWS_ENDPOINT}
+      - TF_VAR_bucket_name=${AWS_BUCKET}
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
