@@ -24,7 +24,7 @@ services:
     container_name: kvault_redis
 
   pg:
-    image: postgres:latest
+    image: postgres:18-alpine
     restart: unless-stopped
     volumes:
       - ./tmp/postgresql:/var/lib/postgresql/18/docker
@@ -39,3 +39,17 @@ services:
       timeout: 5s
       retries: 5
     container_name: kvault_pg
+
+  garage:
+    image: dxflrs/garage:v2.2.0
+    restart: unless-stopped
+    ports:
+      - "3900:3900"
+      - "3901:3901"
+      - "3902:3902"
+      - "3903:3903"
+    volumes:
+      - "./docker/garage/garage.toml:/etc/garage.toml"
+      - "./tmp/garage/meta:/var/lib/garage/meta"
+      - "./tmp/garage/data:/var/lib/garage/data"
+    container_name: kvault_garage
