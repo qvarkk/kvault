@@ -8,13 +8,14 @@ import (
 type Config struct {
 	Debug bool `default:"false"`
 
-	Api   ApiConfig
-	DB    DBConfig
-	Redis RedisConfig
+	Api    ApiConfig
+	DB     DBConfig
+	Redis  RedisConfig
+	Worker WorkerConfig
 }
 
 type ApiConfig struct {
-	Port int `envconfig:"PORT" default:"8080"`
+	Port int `default:"8080"`
 }
 
 type DBConfig struct {
@@ -30,6 +31,10 @@ type RedisConfig struct {
 	Port     int    `default:"6379"`
 	User     string `required:"true"`
 	Password string `required:"true"`
+}
+
+type WorkerConfig struct {
+	ConcurrentTasks int `default:"10"`
 }
 
 func LoadConfig() (*Config, error) {

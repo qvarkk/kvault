@@ -9,8 +9,8 @@ import (
 
 var Logger *zap.Logger
 
-func Init(debug bool) error {
-	logFile, err := os.OpenFile("kvault.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+func Init(filename string, debug bool) error {
+	logFile, err := os.OpenFile(filename+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

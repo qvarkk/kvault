@@ -22,7 +22,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	err = logger.Init(config.Debug)
+	err = logger.Init("api", config.Debug)
 	if err != nil {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
