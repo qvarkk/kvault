@@ -2,11 +2,17 @@ package services
 
 import (
 	"context"
+	"mime/multipart"
+	"net/http"
+	"path/filepath"
 	"qvarkk/kvault/internal/domain"
+
+	"github.com/google/uuid"
 )
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
+	CreateFileMeta(context.Context, *domain.FileMeta) error
 }
 
 type ItemService struct {
@@ -19,6 +25,13 @@ type CreateItemInput struct {
 	Title      string
 	Content    string
 	FileMetaID string
+}
+
+type CreateFileMetaInput struct {
+	Path     string
+	Size     int64
+	MimeType string
+	Status   string
 }
 
 func NewItemService(itemRepo ItemRepo) *ItemService {
@@ -40,4 +53,51 @@ func (i *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	}
 
 	return item, nil
+}
+
+func (i *ItemService) CreateFileMeta(ctx context.Context, input CreateFileMetaInput) (*domain.FileMeta, error) {
+	fileMeta := &domain.FileMeta{
+		Path:     input.Path,
+		Size:     input.Size,
+		MimeType: input.MimeType,
+		Status:   domain.FileStatus(input.Status),
+	}
+
+	err := i.itemRepo.CreateFileMeta(ctx, fileMeta)
+	if err != nil {
+		return nil, NewServiceError(ErrFileMetaNotCreated, "database error", err)
+	}
+
+	return fileMeta, nil
+}
+
+func (i *ItemService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {
+	ext := filepath.Ext(fileHeader.Filename)
+	if ext != ".pdf" {
+		return NewServiceError(ErrPdfFileFormat, "invalid file extension", nil)
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return NewServiceError(ErrInternal, "failed to open uploaded file", err)
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil {
+		return NewServiceError(ErrInternal, "failed to read uploaded file", err)
+	}
+
+	contentType := http.DetectContentType(buffer[:n])
+	if contentType != "application/pdf" {
+		return NewServiceError(ErrPdfFileFormat, "File should be of a PDF content type.", nil)
+	}
+
+	return nil
+}
+
+func (i *ItemService) GeneratePdfFileDestination() string {
+	filename := uuid.New().String() + ".pdf"
+	return filepath.Join("./tmp/uploads", filename)
 }

@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS file_meta (
   path TEXT NOT NULL,
   size BIGINT NOT NULL,
   mime_type TEXT NOT NULL,
-  hash TEXT,
-  status TEXT NOT NULL,
+  hash TEXT, -- idk about this one, prolly should be removed
+  status file_status NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
