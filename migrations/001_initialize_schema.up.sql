@@ -10,14 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 DROP TYPE IF EXISTS file_status;
-CREATE TYPE file_status AS ENUM ('uploaded', 'processing', 'ready', 'error');
+CREATE TYPE file_status AS ENUM ('uploading', 'processing', 'ready', 'error');
 
 CREATE TABLE IF NOT EXISTS file_meta (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   path TEXT NOT NULL,
   size BIGINT NOT NULL,
   mime_type TEXT NOT NULL,
-  hash TEXT, -- idk about this one, prolly should be removed
   status file_status NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

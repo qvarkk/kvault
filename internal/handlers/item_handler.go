@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
+	"qvarkk/kvault/internal/tasks"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 )
 
 type ItemService interface {
@@ -16,6 +18,7 @@ type ItemService interface {
 	CreateFileMeta(context.Context, services.CreateFileMetaInput) (*domain.FileMeta, error)
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
 	GeneratePdfFileDestination() string
+	EnqueueFileUploadTask(context.Context, tasks.FileUploadPayload) (*asynq.TaskInfo, error)
 }
 
 type ItemHandler struct {
@@ -94,7 +97,7 @@ func (h *ItemHandler) UploadFile(ctx *gin.Context) {
 		Path:     dst,
 		Size:     form.File.Size,
 		MimeType: form.File.Header.Get("Content-Type"),
-		Status:   string(domain.FileStatusUploaded),
+		Status:   string(domain.FileStatusUploading),
 	}
 
 	fileMeta, err := h.itemService.CreateFileMeta(ctx.Request.Context(), fileMetaInput)
@@ -122,5 +125,18 @@ func (h *ItemHandler) UploadFile(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, toFileMetaResponse(fileMeta))
+	payload := tasks.FileUploadPayload{
+		UserID:       userID,
+		FileMetaID:   fileMeta.ID,
+		ItemID:       item.ID,
+		TempFilepath: dst,
+	}
+
+	_, err = h.itemService.EnqueueFileUploadTask(ctx, payload)
+	if err != nil {
+		abortOnInternalError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, toTaskResponse(item, fileMeta))
 }

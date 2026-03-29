@@ -9,7 +9,7 @@ type FileStatus string
 type ItemType string
 
 const (
-	FileStatusUploaded   FileStatus = "uploaded"
+	FileStatusUploading  FileStatus = "uploading"
 	FileStatusProcessing FileStatus = "processing"
 	FileStatusReady      FileStatus = "ready"
 	FileStatusError      FileStatus = "error"
@@ -42,14 +42,13 @@ type Item struct {
 }
 
 type FileMeta struct {
-	ID        string         `db:"id"`
-	Path      string         `db:"path"`
-	Size      int64          `db:"size"`
-	MimeType  string         `db:"mime_type"`
-	Hash      sql.NullString `db:"hash"`
-	Status    FileStatus     `db:"status"`
-	CreatedAt time.Time      `db:"created_at"`
-	UpdatedAt time.Time      `db:"updated_at"`
+	ID        string     `db:"id"`
+	Path      string     `db:"path"`
+	Size      int64      `db:"size"`
+	MimeType  string     `db:"mime_type"`
+	Status    FileStatus `db:"status"`
+	CreatedAt time.Time  `db:"created_at"`
+	UpdatedAt time.Time  `db:"updated_at"`
 }
 
 type Tag struct {

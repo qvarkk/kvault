@@ -1,5 +1,8 @@
 package tasks
 
 type FileUploadPayload struct {
-	UserID int
+	UserID       string
+	FileMetaID   string
+	ItemID       string
+	TempFilepath string
 }

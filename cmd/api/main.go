@@ -53,7 +53,7 @@ func main() {
 		DB:       0,
 	}
 
-	_, err = redis.NewRedis(redisConfig)
+	redis, err := redis.NewRedis(redisConfig)
 	if err != nil {
 		logger.Logger.Fatal("Connection to Redis failed", zap.Error(err))
 	}
@@ -66,7 +66,7 @@ func main() {
 	var (
 		authService = services.NewAuthService(userRepo)
 		userService = services.NewUserService(userRepo)
-		itemService = services.NewItemService(itemRepo)
+		itemService = services.NewItemService(itemRepo, redis)
 	)
 
 	services := &routes.Services{

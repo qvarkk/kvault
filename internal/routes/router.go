@@ -37,7 +37,7 @@ func SetupRouter(services *Services) *gin.Engine {
 			authRequired.GET("/users", userHandler.GetByEmail)
 
 			authRequired.POST("/items", itemHandler.Create)
-			authRequired.POST("/items/upload", itemHandler.UploadFile)
+			authRequired.POST("/items/upload-file", itemHandler.UploadFile)
 		}
 	}
 

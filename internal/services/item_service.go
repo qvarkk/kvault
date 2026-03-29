@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"path/filepath"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/internal/redis"
+	"qvarkk/kvault/internal/tasks"
 
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 )
 
 type ItemRepo interface {
@@ -17,6 +20,7 @@ type ItemRepo interface {
 
 type ItemService struct {
 	itemRepo ItemRepo
+	redis    *redis.Redis
 }
 
 type CreateItemInput struct {
@@ -34,8 +38,11 @@ type CreateFileMetaInput struct {
 	Status   string
 }
 
-func NewItemService(itemRepo ItemRepo) *ItemService {
-	return &ItemService{itemRepo: itemRepo}
+func NewItemService(itemRepo ItemRepo, redis *redis.Redis) *ItemService {
+	return &ItemService{
+		itemRepo: itemRepo,
+		redis:    redis,
+	}
 }
 
 func (i *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*domain.Item, error) {
@@ -100,4 +107,18 @@ func (i *ItemService) ValidatePdfFile(ctx context.Context, fileHeader *multipart
 func (i *ItemService) GeneratePdfFileDestination() string {
 	filename := uuid.New().String() + ".pdf"
 	return filepath.Join("./tmp/uploads", filename)
+}
+
+func (i *ItemService) EnqueueFileUploadTask(ctx context.Context, payload tasks.FileUploadPayload) (*asynq.TaskInfo, error) {
+	task, err := tasks.NewFileUploadTask(payload)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "failed to create task", err)
+	}
+
+	info, err := i.redis.AsynqClient.EnqueueContext(ctx, task)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "failed to enqueue task", err)
+	}
+
+	return info, nil
 }
