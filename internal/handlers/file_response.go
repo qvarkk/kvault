@@ -7,7 +7,7 @@ import (
 
 type FileResponse struct {
 	ID        string `json:"id"`
-	Path      string `json:"path"`
+	S3Key     string `json:"s3_key"`
 	Size      int64  `json:"size"`
 	MimeType  string `json:"mime_type"`
 	Status    string `json:"status"`
@@ -17,7 +17,7 @@ type FileResponse struct {
 func toFileResponse(fileMeta *domain.FileMeta) FileResponse {
 	return FileResponse{
 		ID:        fileMeta.ID,
-		Path:      fileMeta.Path,
+		S3Key:     fileMeta.S3Key,
 		Size:      fileMeta.Size,
 		MimeType:  fileMeta.MimeType,
 		Status:    string(fileMeta.Status),

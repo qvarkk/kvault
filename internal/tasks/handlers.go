@@ -3,16 +3,17 @@ package tasks
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 
 	"github.com/hibiken/asynq"
 )
 
-func HandleFileUploadTask(ctx context.Context, t *asynq.Task) error {
-	var p FileUploadPayload
+func HandlePdfProcessTask(ctx context.Context, t *asynq.Task) error {
+	var p PdfProcessPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
-	log.Printf(" [*] Uploaded file as User %d", p.UserID)
+
+	fmt.Printf("[*] Processing PDF\n\tUser: %s\n\tFile: %s\n\tItem: %s\n", p.UserID, p.FileMetaID, p.ItemID)
 	return nil
 }

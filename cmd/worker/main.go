@@ -32,7 +32,7 @@ func main() {
 	)
 
 	mux := asynq.NewServeMux()
-	mux.HandleFunc(tasks.TypeFileUpload, tasks.HandleFileUploadTask)
+	mux.HandleFunc(tasks.TypePdfProcess, tasks.HandlePdfProcessTask)
 
 	if err := srv.Run(mux); err != nil {
 		log.Fatal(err)

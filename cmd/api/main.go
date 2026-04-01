@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"qvarkk/kvault/config"
+	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
@@ -58,15 +59,22 @@ func main() {
 		logger.Logger.Fatal("Connection to Redis failed", zap.Error(err))
 	}
 
+	aws, err := aws.NewAws(config.Aws)
+	if err != nil {
+		logger.Logger.Fatal("Failed loading config", zap.Error(err))
+	}
+
 	var (
 		userRepo = repositories.NewUserRepo(pg.DB)
 		itemRepo = repositories.NewItemRepo(pg.DB)
+		fileRepo = repositories.NewFileRepo(pg.DB)
 	)
 
 	var (
 		authService = services.NewAuthService(userRepo)
 		userService = services.NewUserService(userRepo)
-		itemService = services.NewItemService(itemRepo, redis)
+		itemService = services.NewItemService(itemRepo)
+		fileService = services.NewFileService(fileRepo, redis, aws)
 	)
 
 	services := &routes.Services{
@@ -75,6 +83,7 @@ func main() {
 		MwUserService:   userService,
 		UserService:     userService,
 		ItemService:     itemService,
+		FileService:     fileService,
 	}
 
 	r := routes.SetupRouter(services)

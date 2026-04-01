@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	TypeFileUpload = "file:upload"
+	TypePdfProcess = "pdf:process"
 )
 
-func NewFileUploadTask(payload FileUploadPayload) (*asynq.Task, error) {
+func NewPdfProcessTask(payload PdfProcessPayload) (*asynq.Task, error) {
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	return asynq.NewTask(TypeFileUpload, jsonPayload), nil
+	return asynq.NewTask(TypePdfProcess, jsonPayload), nil
 }

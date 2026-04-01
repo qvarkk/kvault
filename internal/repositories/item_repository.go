@@ -21,18 +21,7 @@ const createItemQuery = `
 	RETURNING *
 `
 
-const createFileMetaQuery = `
-	INSERT INTO file_meta (path, size, mime_type, status)
-	VALUES ($1, $2, $3, $4)
-	RETURNING *
-`
-
-func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	return r.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content, item.FileMetaID).
+func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
+	return i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content, item.FileMetaID).
 		StructScan(item)
-}
-
-func (r *ItemRepo) CreateFileMeta(ctx context.Context, fileMeta *domain.FileMeta) error {
-	return r.db.QueryRowxContext(ctx, createFileMetaQuery, fileMeta.Path, fileMeta.Size, fileMeta.MimeType, fileMeta.Status).
-		StructScan(fileMeta)
 }

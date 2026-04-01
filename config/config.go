@@ -11,6 +11,7 @@ type Config struct {
 	Api    ApiConfig
 	DB     DBConfig
 	Redis  RedisConfig
+	Aws    AwsConfig
 	Worker WorkerConfig
 }
 
@@ -31,6 +32,14 @@ type RedisConfig struct {
 	Port     int    `default:"6379"`
 	User     string `required:"true"`
 	Password string `required:"true"`
+}
+
+type AwsConfig struct {
+	AccessKeyID     string `envconfig:"ACCESS_KEY_ID"`
+	SecretAccessKey string `envconfig:"SECRET_ACCESS_KEY"`
+	Region          string `envconfig:"REGION"`
+	EndpointUrl     string `envconfig:"ENDPOINT_URL"`
+	S3Bucket        string `envconfig:"S3_BUCKET"`
 }
 
 type WorkerConfig struct {

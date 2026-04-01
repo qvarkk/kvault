@@ -3,22 +3,15 @@ package handlers
 import (
 	"context"
 	"errors"
-	"mime/multipart"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
-	"qvarkk/kvault/internal/tasks"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
 )
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
-	CreateFileMeta(context.Context, services.CreateFileMetaInput) (*domain.FileMeta, error)
-	ValidatePdfFile(context.Context, *multipart.FileHeader) error
-	GeneratePdfFileDestination() string
-	EnqueueFileUploadTask(context.Context, tasks.FileUploadPayload) (*asynq.TaskInfo, error)
 }
 
 type ItemHandler struct {
@@ -26,7 +19,9 @@ type ItemHandler struct {
 }
 
 func NewItemHandler(itemService ItemService) *ItemHandler {
-	return &ItemHandler{itemService: itemService}
+	return &ItemHandler{
+		itemService: itemService,
+	}
 }
 
 type createItemRequest struct {
@@ -36,11 +31,7 @@ type createItemRequest struct {
 	FileMetaID string `json:"file_meta_id" binding:"omitempty,uuid4"`
 }
 
-type uploadFileForm struct {
-	File *multipart.FileHeader `form:"file" binding:"required"`
-}
-
-func (h *ItemHandler) Create(ctx *gin.Context) {
+func (i *ItemHandler) Create(ctx *gin.Context) {
 	userID := ctx.MustGet("userID").(string)
 
 	var req createItemRequest
@@ -57,7 +48,7 @@ func (h *ItemHandler) Create(ctx *gin.Context) {
 		FileMetaID: req.FileMetaID,
 	}
 
-	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
+	item, err := i.itemService.CreateNew(ctx.Request.Context(), itemInput)
 	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
 		abortOnDbError(ctx, err)
 		return
@@ -67,76 +58,4 @@ func (h *ItemHandler) Create(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, toItemResponse(item))
-}
-
-func (h *ItemHandler) UploadFile(ctx *gin.Context) {
-	userID := ctx.MustGet("userID").(string)
-
-	var form uploadFileForm
-	if err := ctx.ShouldBind(&form); err != nil {
-		abortOnBindError(ctx, err)
-		return
-	}
-
-	err := h.itemService.ValidatePdfFile(ctx, form.File)
-	if errors.Is(err, services.ErrPdfFileFormat) {
-		abortWithPublicError(ctx, err, "Failed to validate PDF file.")
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	dst := h.itemService.GeneratePdfFileDestination()
-	if err := ctx.SaveUploadedFile(form.File, dst); err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	fileMetaInput := services.CreateFileMetaInput{
-		Path:     dst,
-		Size:     form.File.Size,
-		MimeType: form.File.Header.Get("Content-Type"),
-		Status:   string(domain.FileStatusUploading),
-	}
-
-	fileMeta, err := h.itemService.CreateFileMeta(ctx.Request.Context(), fileMetaInput)
-	if errors.Is(err, services.ErrItemNotCreated) || fileMeta == nil {
-		abortOnDbError(ctx, err)
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	itemInput := services.CreateItemInput{
-		UserID:     userID,
-		Type:       string(domain.ItemTypeFile),
-		Title:      form.File.Filename,
-		FileMetaID: fileMeta.ID,
-	}
-
-	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
-	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
-		abortOnDbError(ctx, err)
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	payload := tasks.FileUploadPayload{
-		UserID:       userID,
-		FileMetaID:   fileMeta.ID,
-		ItemID:       item.ID,
-		TempFilepath: dst,
-	}
-
-	_, err = h.itemService.EnqueueFileUploadTask(ctx, payload)
-	if err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, toTaskResponse(item, fileMeta))
 }

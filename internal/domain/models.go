@@ -43,7 +43,7 @@ type Item struct {
 
 type FileMeta struct {
 	ID        string     `db:"id"`
-	Path      string     `db:"path"`
+	S3Key     string     `db:"s3_key"`
 	Size      int64      `db:"size"`
 	MimeType  string     `db:"mime_type"`
 	Status    FileStatus `db:"status"`
