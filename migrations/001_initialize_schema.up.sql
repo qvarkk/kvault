@@ -14,7 +14,7 @@ CREATE TYPE file_status AS ENUM ('uploading', 'processing', 'ready', 'error');
 
 CREATE TABLE IF NOT EXISTS file_meta (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  path TEXT NOT NULL,
+  s3_key TEXT NOT NULL,
   size BIGINT NOT NULL,
   mime_type TEXT NOT NULL,
   status file_status NOT NULL,
