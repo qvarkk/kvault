@@ -1,0 +1,9 @@
+basePath: /api/v1
+host: localhost:6767
+info:
+  contact: {}
+  description: REST API for managing and searching notes and documents
+  title: KVault API
+  version: "1.0"
+paths: {}
+swagger: "2.0"

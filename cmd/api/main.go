@@ -17,6 +17,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// @title           KVault API
+// @version         1.0
+// @description     REST API for managing and searching notes and documents
+// @host            localhost:6767
+// @BasePath        /api/v1
 func main() {
 	config, err := config.LoadConfig()
 	if err != nil {
