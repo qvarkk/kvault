@@ -70,7 +70,7 @@ func main() {
 
 	aws, err := aws.NewAws(config.Aws)
 	if err != nil {
-		logger.Logger.Fatal("Failed loading config", zap.Error(err))
+		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
 	}
 
 	var (

@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
@@ -21,8 +23,12 @@ const createFileMetaQuery = `
 	RETURNING *
 `
 
-func (f *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
-	return f.db.QueryRowxContext(
+const getFileByIDQuery = `
+	SELECT * FROM files WHERE id=$1
+`
+
+func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
+	return r.db.QueryRowxContext(
 		ctx,
 		createFileMetaQuery,
 		file.UserID,
@@ -32,4 +38,17 @@ func (f *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 		file.Status,
 	).
 		StructScan(file)
+}
+
+func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, error) {
+	var file domain.File
+	err := r.db.GetContext(ctx, &file, getFileByIDQuery, fileID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &file, nil
 }

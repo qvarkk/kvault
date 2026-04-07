@@ -4,6 +4,8 @@
 APP_NAME   := kvault
 API_CMD_PATH   := ./cmd/api
 API_BINARY     := bin/$(APP_NAME)_api
+WORKER_CMD_PATH   := ./cmd/worker
+WORKER_BINARY     := bin/$(APP_NAME)_worker
 SWAGGER_OUT := ./docs
  
 # ── Development ──
@@ -12,6 +14,12 @@ run-api:
 
 build-api:
 	go build -o $(API_BINARY) $(API_CMD_PATH)/main.go
+
+run-worker:
+	go run $(WORKER_CMD_PATH)/main.go
+
+build-worker:
+	go build -o $(WORKER_BINARY) $(WORKER_CMD_PATH)/main.go
 
 clean:
 	rm -rf bin/
