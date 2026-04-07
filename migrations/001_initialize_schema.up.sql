@@ -9,21 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-DROP TYPE IF EXISTS file_status;
-CREATE TYPE file_status AS ENUM ('uploading', 'processing', 'ready', 'error');
-
-CREATE TABLE IF NOT EXISTS file_meta (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  s3_key TEXT NOT NULL,
-  size BIGINT NOT NULL,
-  mime_type TEXT NOT NULL,
-  status file_status NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 DROP TYPE IF EXISTS item_type;
-CREATE TYPE item_type AS ENUM ('text', 'file', 'url');
+CREATE TYPE item_type AS ENUM ('text', 'url');
 
 CREATE TABLE IF NOT EXISTS items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -31,10 +18,31 @@ CREATE TABLE IF NOT EXISTS items (
   type item_type NOT NULL,
   title TEXT NOT NULL,
   content TEXT,
-  file_meta_id UUID REFERENCES file_meta(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  search_vector tsvector
 );
+
+CREATE INDEX items_fts ON items USING gin(search_vector);
+
+DROP TYPE IF EXISTS file_status;
+CREATE TYPE file_status AS ENUM ('uploading', 'processing', 'ready', 'error');
+
+CREATE TABLE IF NOT EXISTS files (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  original_name TEXT NOT NULL,
+  extracted_content TEXT,
+  s3_key TEXT NOT NULL,
+  size BIGINT NOT NULL,
+  mime_type TEXT NOT NULL,
+  status file_status NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  search_vector tsvector
+);
+
+CREATE INDEX files_fts ON files USING gin(search_vector);
 
 CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -14,7 +14,7 @@ type FileResponse struct {
 	CreatedAt string `json:"created_at"`
 }
 
-func toFileResponse(fileMeta *domain.FileMeta) FileResponse {
+func toFileResponse(fileMeta *domain.File) FileResponse {
 	return FileResponse{
 		ID:        fileMeta.ID,
 		S3Key:     fileMeta.S3Key,

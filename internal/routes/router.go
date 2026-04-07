@@ -23,7 +23,7 @@ func SetupRouter(services *Services) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(services.AuthService, services.AuthUserService)
 	userHandler := handlers.NewUserHandler(services.UserService)
 	itemHandler := handlers.NewItemHandler(services.ItemService)
-	fileHandler := handlers.NewFileHandler(services.FileService, services.ItemService)
+	fileHandler := handlers.NewFileHandler(services.FileService)
 
 	apiGroup := r.Group("/api")
 	{

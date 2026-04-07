@@ -14,18 +14,10 @@ type ItemService struct {
 }
 
 type CreateItemInput struct {
-	UserID     string
-	Type       string
-	Title      string
-	Content    string
-	FileMetaID string
-}
-
-type CreateFileMetaInput struct {
-	S3Key    string
-	Size     int64
-	MimeType string
-	Status   string
+	UserID  string
+	Type    string
+	Title   string
+	Content string
 }
 
 func NewItemService(itemRepo ItemRepo) *ItemService {
@@ -36,11 +28,10 @@ func NewItemService(itemRepo ItemRepo) *ItemService {
 
 func (i *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*domain.Item, error) {
 	item := &domain.Item{
-		UserID:     input.UserID,
-		Type:       domain.ItemType(input.Type),
-		Title:      input.Title,
-		Content:    NewNullString(input.Content),
-		FileMetaID: NewNullString(input.FileMetaID),
+		UserID:  input.UserID,
+		Type:    domain.ItemType(input.Type),
+		Title:   input.Title,
+		Content: NewNullString(input.Content),
 	}
 
 	err := i.itemRepo.CreateNew(ctx, item)

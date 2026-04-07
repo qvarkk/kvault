@@ -6,12 +6,12 @@ import (
 )
 
 var (
-	ErrInternal           = errors.New("services: internal error")
-	ErrUserNotCreated     = errors.New("services: failed to create user")
-	ErrUserNotFound       = errors.New("services: user was not found")
-	ErrItemNotCreated     = errors.New("service: failed to create item")
-	ErrFileMetaNotCreated = errors.New("service: failed to create file metadata")
-	ErrPdfFileFormat      = errors.New("services: provided file has to be a PDF file")
+	ErrInternal       = errors.New("services: internal error")
+	ErrUserNotCreated = errors.New("services: failed to create user")
+	ErrUserNotFound   = errors.New("services: user was not found")
+	ErrItemNotCreated = errors.New("service: failed to create item")
+	ErrFileNotCreated = errors.New("service: failed to create file")
+	ErrPdfFileFormat  = errors.New("services: provided file has to be a PDF file")
 )
 
 type ServiceError struct {

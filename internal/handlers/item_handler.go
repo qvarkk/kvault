@@ -25,10 +25,9 @@ func NewItemHandler(itemService ItemService) *ItemHandler {
 }
 
 type createItemRequest struct {
-	Type       string `json:"type" binding:"required,oneof=text file url"`
-	Title      string `json:"title" binding:"required"`
-	Content    string `json:"content"`
-	FileMetaID string `json:"file_meta_id" binding:"omitempty,uuid4"`
+	Type    string `json:"type" binding:"required,oneof=text url"`
+	Title   string `json:"title" binding:"required"`
+	Content string `json:"content"`
 }
 
 func (i *ItemHandler) Create(ctx *gin.Context) {
@@ -41,11 +40,10 @@ func (i *ItemHandler) Create(ctx *gin.Context) {
 	}
 
 	itemInput := services.CreateItemInput{
-		UserID:     userID,
-		Type:       req.Type,
-		Title:      req.Title,
-		Content:    req.Content,
-		FileMetaID: req.FileMetaID,
+		UserID:  userID,
+		Type:    req.Type,
+		Title:   req.Title,
+		Content: req.Content,
 	}
 
 	item, err := i.itemService.CreateNew(ctx.Request.Context(), itemInput)

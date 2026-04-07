@@ -17,7 +17,7 @@ import (
 )
 
 type FileRepo interface {
-	CreateNew(context.Context, *domain.FileMeta) error
+	CreateNew(context.Context, *domain.File) error
 }
 
 type FileService struct {
@@ -27,10 +27,12 @@ type FileService struct {
 }
 
 type CreateFileInput struct {
-	S3Key    string
-	Size     int64
-	MimeType string
-	Status   string
+	UserID       string
+	OriginalName string
+	S3Key        string
+	Size         int64
+	MimeType     string
+	Status       string
 }
 
 func NewFileService(fileRepo FileRepo, redis *redis.Redis, aws *aws.Aws) *FileService {
@@ -41,20 +43,22 @@ func NewFileService(fileRepo FileRepo, redis *redis.Redis, aws *aws.Aws) *FileSe
 	}
 }
 
-func (f *FileService) CreateNew(ctx context.Context, input CreateFileMetaInput) (*domain.FileMeta, error) {
-	fileMeta := &domain.FileMeta{
-		S3Key:    input.S3Key,
-		Size:     input.Size,
-		MimeType: input.MimeType,
-		Status:   domain.FileStatus(input.Status),
+func (f *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
+	file := &domain.File{
+		UserID:       input.UserID,
+		OriginalName: input.OriginalName,
+		S3Key:        input.S3Key,
+		Size:         input.Size,
+		MimeType:     input.MimeType,
+		Status:       domain.FileStatus(input.Status),
 	}
 
-	err := f.fileRepo.CreateNew(ctx, fileMeta)
+	err := f.fileRepo.CreateNew(ctx, file)
 	if err != nil {
-		return nil, NewServiceError(ErrFileMetaNotCreated, "database error", err)
+		return nil, NewServiceError(ErrFileNotCreated, "database error", err)
 	}
 
-	return fileMeta, nil
+	return file, nil
 }
 
 func (f *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {

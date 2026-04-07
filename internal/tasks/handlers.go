@@ -14,6 +14,6 @@ func HandlePdfProcessTask(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	fmt.Printf("[*] Processing PDF\n\tUser: %s\n\tFile: %s\n\tItem: %s\n", p.UserID, p.FileMetaID, p.ItemID)
+	fmt.Printf("[*] Processing PDF\n\tUser: %s\n\tFile: %s\n", p.UserID, p.FileID)
 	return nil
 }

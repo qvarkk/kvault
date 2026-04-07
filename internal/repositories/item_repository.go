@@ -16,12 +16,12 @@ func NewItemRepo(db *sqlx.DB) *ItemRepo {
 }
 
 const createItemQuery = `
-	INSERT INTO items (user_id, type, title, content, file_meta_id)
-	VALUES ($1, $2, $3, $4, $5)
+	INSERT INTO items (user_id, type, title, content)
+	VALUES ($1, $2, $3, $4)
 	RETURNING *
 `
 
 func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	return i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content, item.FileMetaID).
+	return i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content).
 		StructScan(item)
 }

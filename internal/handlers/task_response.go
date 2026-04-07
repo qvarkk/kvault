@@ -9,7 +9,7 @@ type TaskResponse struct {
 	File FileResponse `json:"file"`
 }
 
-func toTaskResponse(item *domain.Item, fileMeta *domain.FileMeta) TaskResponse {
+func toTaskResponse(item *domain.Item, fileMeta *domain.File) TaskResponse {
 	return TaskResponse{
 		Item: toItemResponse(item),
 		File: toFileResponse(fileMeta),

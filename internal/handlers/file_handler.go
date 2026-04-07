@@ -14,7 +14,7 @@ import (
 )
 
 type FileService interface {
-	CreateNew(context.Context, services.CreateFileMetaInput) (*domain.FileMeta, error)
+	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
 	UploadPdfFileToS3(context.Context, *multipart.FileHeader) (string, error)
 	EnqueuePdfProcessTask(context.Context, tasks.PdfProcessPayload) (*asynq.TaskInfo, error)
@@ -22,13 +22,11 @@ type FileService interface {
 
 type FileHandler struct {
 	fileService FileService
-	itemService ItemService
 }
 
-func NewFileHandler(fileService FileService, itemService ItemService) *FileHandler {
+func NewFileHandler(fileService FileService) *FileHandler {
 	return &FileHandler{
 		fileService: fileService,
-		itemService: itemService,
 	}
 }
 
@@ -60,31 +58,17 @@ func (f *FileHandler) UploadFile(ctx *gin.Context) {
 		return
 	}
 
-	fileMetaInput := services.CreateFileMetaInput{
-		S3Key:    s3Key,
-		Size:     form.File.Size,
-		MimeType: form.File.Header.Get("Content-Type"),
-		Status:   string(domain.FileStatusUploading),
+	fileInput := services.CreateFileInput{
+		UserID:       userID,
+		OriginalName: form.File.Filename,
+		S3Key:        s3Key,
+		Size:         form.File.Size,
+		MimeType:     form.File.Header.Get("Content-Type"),
+		Status:       string(domain.FileStatusUploading),
 	}
 
-	fileMeta, err := f.fileService.CreateNew(ctx.Request.Context(), fileMetaInput)
-	if errors.Is(err, services.ErrItemNotCreated) || fileMeta == nil {
-		abortOnDbError(ctx, err)
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
-	}
-
-	itemInput := services.CreateItemInput{
-		UserID:     userID,
-		Type:       string(domain.ItemTypeFile),
-		Title:      form.File.Filename,
-		FileMetaID: fileMeta.ID,
-	}
-
-	item, err := f.itemService.CreateNew(ctx.Request.Context(), itemInput)
-	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
+	file, err := f.fileService.CreateNew(ctx.Request.Context(), fileInput)
+	if errors.Is(err, services.ErrItemNotCreated) || file == nil {
 		abortOnDbError(ctx, err)
 		return
 	} else if err != nil {
@@ -93,9 +77,8 @@ func (f *FileHandler) UploadFile(ctx *gin.Context) {
 	}
 
 	payload := tasks.PdfProcessPayload{
-		UserID:     userID,
-		FileMetaID: fileMeta.ID,
-		ItemID:     item.ID,
+		UserID: userID,
+		FileID: file.ID,
 	}
 
 	_, err = f.fileService.EnqueuePdfProcessTask(ctx, payload)
@@ -104,5 +87,5 @@ func (f *FileHandler) UploadFile(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, toTaskResponse(item, fileMeta))
+	ctx.JSON(http.StatusCreated, toFileResponse(file))
 }

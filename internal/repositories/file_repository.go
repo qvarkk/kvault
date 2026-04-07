@@ -16,12 +16,20 @@ func NewFileRepo(db *sqlx.DB) *FileRepo {
 }
 
 const createFileMetaQuery = `
-	INSERT INTO file_meta (s3_key, size, mime_type, status)
-	VALUES ($1, $2, $3, $4)
+	INSERT INTO files (user_id, original_name, s3_key, size, mime_type, status)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	RETURNING *
 `
 
-func (f *FileRepo) CreateNew(ctx context.Context, fileMeta *domain.FileMeta) error {
-	return f.db.QueryRowxContext(ctx, createFileMetaQuery, fileMeta.S3Key, fileMeta.Size, fileMeta.MimeType, fileMeta.Status).
-		StructScan(fileMeta)
+func (f *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
+	return f.db.QueryRowxContext(
+		ctx,
+		createFileMetaQuery,
+		file.UserID,
+		file.OriginalName,
+		file.S3Key, file.Size,
+		file.MimeType,
+		file.Status,
+	).
+		StructScan(file)
 }
