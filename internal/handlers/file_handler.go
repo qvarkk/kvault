@@ -34,6 +34,19 @@ type uploadFileForm struct {
 	File *multipart.FileHeader `form:"file" binding:"required"`
 }
 
+// @Summary      Upload a PDF file to your vault
+// @Description  Validates and uploads given file to S3 container,
+// @Description  enqueues redis task to process the file
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Accept       mpfd
+// @Produce      json
+// @Param        file formData file true "PDF file"
+// @Success      201   {object}  FileResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/upload [post]
 func (f *FileHandler) UploadFile(ctx *gin.Context) {
 	userID := ctx.MustGet("userID").(string)
 

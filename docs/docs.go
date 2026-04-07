@@ -187,6 +187,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/files/upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Validates and uploads given file to S3 container,\nenqueues redis task to process the file",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Files"
+                ],
+                "summary": "Upload a PDF file to your vault",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "PDF file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/items": {
             "post": {
                 "security": [
@@ -204,7 +259,7 @@ const docTemplate = `{
                 "tags": [
                     "Items"
                 ],
-                "summary": "Create an item",
+                "summary": "Create an item in your vault",
                 "parameters": [
                     {
                         "description": "Item data",
@@ -246,6 +301,29 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "handlers.FileResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "s3_key": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.ItemResponse": {
             "type": "object",
             "properties": {

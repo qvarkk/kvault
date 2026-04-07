@@ -30,7 +30,7 @@ type createItemRequest struct {
 	Content string `json:"content" example:"Some content blah blah."`
 }
 
-// @Summary      Create an item
+// @Summary      Create an item in your vault
 // @Description  Creates an item with data passed through body
 // @Tags         Items
 // @Security     ApiKeyAuth

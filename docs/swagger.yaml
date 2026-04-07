@@ -1,5 +1,20 @@
 basePath: /api/v1
 definitions:
+  handlers.FileResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      s3_key:
+        type: string
+      size:
+        type: integer
+      status:
+        type: string
+    type: object
   handlers.ItemResponse:
     properties:
       content:
@@ -211,6 +226,43 @@ paths:
       summary: User registration
       tags:
       - Authentication
+  /files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Validates and uploads given file to S3 container,
+        enqueues redis task to process the file
+      parameters:
+      - description: PDF file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.FileResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a PDF file to your vault
+      tags:
+      - Files
   /items:
     post:
       consumes:
@@ -244,7 +296,7 @@ paths:
             $ref: '#/definitions/httpx.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Create an item
+      summary: Create an item in your vault
       tags:
       - Items
 securityDefinitions:
