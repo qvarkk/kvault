@@ -86,15 +86,18 @@ func main() {
 		fileService = services.NewFileService(fileRepo, redis, aws)
 	)
 
-	services := &routes.Services{
-		AuthService:     authService,
-		AuthUserService: userService,
-		MwUserService:   userService,
-		UserService:     userService,
-		ItemService:     itemService,
-		FileService:     fileService,
+	hs := &routes.HandlerServices{
+		Auth:     authService,
+		AuthUser: userService,
+		User:     userService,
+		Item:     itemService,
+		File:     fileService,
 	}
 
-	r := routes.SetupRouter(services)
+	ms := &routes.MiddlewareServices{
+		User: userService,
+	}
+
+	r := routes.SetupRouter(hs, ms)
 	r.Run(fmt.Sprintf(":%d", config.Api.Port))
 }
