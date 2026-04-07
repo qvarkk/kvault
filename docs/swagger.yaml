@@ -1,5 +1,20 @@
 basePath: /api/v1
 definitions:
+  handlers.ItemResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      user_id:
+        type: string
+    type: object
   handlers.UserResponse:
     properties:
       api_key:
@@ -22,6 +37,23 @@ definitions:
     required:
     - email
     - password
+    type: object
+  handlers.createItemRequest:
+    properties:
+      content:
+        example: Some content blah blah.
+        type: string
+      title:
+        example: Example title
+        type: string
+      type:
+        enum:
+        - text
+        - url
+        type: string
+    required:
+    - title
+    - type
     type: object
   handlers.registerUserRequest:
     properties:
@@ -111,6 +143,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -130,6 +166,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -171,6 +211,42 @@ paths:
       summary: User registration
       tags:
       - Authentication
+  /items:
+    post:
+      consumes:
+      - application/json
+      description: Creates an item with data passed through body
+      parameters:
+      - description: Item data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ItemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create an item
+      tags:
+      - Items
 securityDefinitions:
   ApiKeyAuth:
     in: header

@@ -80,8 +80,8 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
 // @Produce      json
 // @Param        body body authenticateUserRequest true "User credentials"
 // @Success      200   {object}  UserResponse
-// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/login [post]
 func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
@@ -106,6 +106,7 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
 // @Security     ApiKeyAuth
 // @Produce      json
 // @Success      200   {object}  UserResponse
+// @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/me [get]
 func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
@@ -126,6 +127,7 @@ func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
 // @Security     ApiKeyAuth
 // @Produce      json
 // @Success      200   {object}  UserResponse
+// @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) RotateApiKey(ctx *gin.Context) {
