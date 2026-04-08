@@ -41,17 +41,17 @@ type Item struct {
 }
 
 type File struct {
-	ID               string         `db:"id"`
-	UserID           string         `db:"user_id"`
-	OriginalName     string         `db:"original_name"`
-	ExtractedContent sql.NullString `db:"extracted_content"`
-	S3Key            string         `db:"s3_key"`
-	Size             int64          `db:"size"`
-	MimeType         string         `db:"mime_type"`
-	Status           FileStatus     `db:"status"`
-	CreatedAt        time.Time      `db:"created_at"`
-	UpdatedAt        time.Time      `db:"updated_at"`
-	SearchVector     string         `db:"search_vector"`
+	ID           string         `db:"id"`
+	UserID       string         `db:"user_id"`
+	OriginalName string         `db:"original_name"`
+	TextContent  sql.NullString `db:"text_content"`
+	S3Key        string         `db:"s3_key"`
+	Size         int64          `db:"size"`
+	MimeType     string         `db:"mime_type"`
+	Status       FileStatus     `db:"status"`
+	CreatedAt    time.Time      `db:"created_at"`
+	UpdatedAt    time.Time      `db:"updated_at"`
+	SearchVector string         `db:"search_vector"`
 }
 
 type Tag struct {

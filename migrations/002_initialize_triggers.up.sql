@@ -12,7 +12,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION update_search_vector_files()
 RETURNS trigger AS $$
 BEGIN
-  NEW.search_vector := to_tsvector('simple', coalesce(NEW.extracted_content, ''));
+  NEW.search_vector := to_tsvector('simple', coalesce(NEW.text_content, ''));
 
   RETURN NEW;
 END;
@@ -25,7 +25,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_search_vector_items();
 
 CREATE TRIGGER files_search_vector_trigger
-BEFORE INSERT OR UPDATE OF original_name, extracted_content
+BEFORE INSERT OR UPDATE OF text_content
 ON files
 FOR EACH ROW
 EXECUTE FUNCTION update_search_vector_files();

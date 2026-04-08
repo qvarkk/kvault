@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"qvarkk/kvault/internal/domain"
 
 	"github.com/hibiken/asynq"
 )
 
 type FileTaskService interface {
-	ExtractTextFromS3(context.Context, string) (string, error)
+	ExtractTextFromFile(context.Context, *domain.File) (string, error)
+	UpdateFileStatusByID(context.Context, string, domain.FileStatus) (*domain.File, error)
+	UpdateFileTextContentByID(ctx context.Context, fileID string, textContent string) (*domain.File, error)
 }
 
 type FileTaskHandler struct {
@@ -28,12 +31,29 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 		return err
 	}
 
-	text, err := h.fileService.ExtractTextFromS3(ctx, p.FileID)
+	file, err := h.fileService.UpdateFileStatusByID(ctx, p.FileID, domain.FileStatusProcessing)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("File status updated to processing: %s\n", file.Status)
 
-	fmt.Printf("Extracted text:\n%s\n", text)
+	text, err := h.fileService.ExtractTextFromFile(ctx, file)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Text extracted: %s\n", text[:50])
+
+	file, err = h.fileService.UpdateFileTextContentByID(ctx, p.FileID, text)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Text content updated: %s\n", file.TextContent.String[:50])
+
+	file, err = h.fileService.UpdateFileStatusByID(ctx, p.FileID, domain.FileStatusReady)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("File status updated to ready: %s\n", file.Status)
 
 	return nil
 }

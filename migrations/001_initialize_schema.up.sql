@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS files (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id),
   original_name TEXT NOT NULL,
-  extracted_content TEXT,
+  text_content TEXT,
   s3_key TEXT NOT NULL,
   size BIGINT NOT NULL,
   mime_type TEXT NOT NULL,

@@ -16,6 +16,8 @@ import (
 
 type FileTaskRepo interface {
 	GetByID(context.Context, string) (*domain.File, error)
+	UpdateStatusByID(ctx context.Context, fileID string, status string) (*domain.File, error)
+	UpdateTextContentByID(ctx context.Context, fileID string, textContent string) (*domain.File, error)
 }
 
 type FileTaskService struct {
@@ -30,12 +32,7 @@ func NewFileTaskService(fileRepo FileTaskRepo, aws *aws.Aws) *FileTaskService {
 	}
 }
 
-func (s *FileTaskService) ExtractTextFromS3(ctx context.Context, fileID string) (string, error) {
-	file, err := s.fileRepo.GetByID(ctx, fileID)
-	if err != nil {
-		return "", err
-	}
-
+func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.File) (string, error) {
 	resp, err := s.aws.S3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: awsSdk.String(s.aws.BucketName),
 		Key:    awsSdk.String(file.S3Key),
@@ -87,4 +84,20 @@ func (s *FileTaskService) ExtractTextFromS3(ctx context.Context, fileID string) 
 	words := strings.Fields(rawText)
 	normalizedText := strings.Join(words, " ")
 	return normalizedText, nil
+}
+
+func (s *FileTaskService) UpdateFileStatusByID(
+	ctx context.Context,
+	fileID string,
+	status domain.FileStatus,
+) (*domain.File, error) {
+	return s.fileRepo.UpdateStatusByID(ctx, fileID, string(status))
+}
+
+func (s *FileTaskService) UpdateFileTextContentByID(
+	ctx context.Context,
+	fileID string,
+	textContent string,
+) (*domain.File, error) {
+	return s.fileRepo.UpdateTextContentByID(ctx, fileID, textContent)
 }
