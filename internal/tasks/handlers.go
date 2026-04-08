@@ -3,10 +3,11 @@ package tasks
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/logger"
 
 	"github.com/hibiken/asynq"
+	"go.uber.org/zap"
 )
 
 type FileTaskService interface {
@@ -25,35 +26,47 @@ func NewFileTaskHandler(fileService FileTaskService) *FileTaskHandler {
 	}
 }
 
-func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Task) error {
+func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Task) (err error) {
 	var p PdfProcessPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+	if err = json.Unmarshal(t.Payload(), &p); err != nil {
+		logger.Logger.Error("Failed to parse task payload", zap.Error(err), zap.String("file_id", p.FileID))
 		return err
 	}
 
-	file, err := h.fileService.UpdateFileStatusByID(ctx, p.FileID, domain.FileStatusProcessing)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("File status updated to processing: %s\n", file.Status)
+	defer func() {
+		if err != nil && p.FileID != "" {
+			_, updateErr := h.fileService.UpdateFileStatusByID(context.Background(), p.FileID, domain.FileStatusError)
+			if updateErr != nil {
+				logger.Logger.Error(
+					"Failed to update file status to error",
+					zap.Error(updateErr),
+					zap.String("file_id", p.FileID),
+				)
+			}
+		}
+	}()
 
-	text, err := h.fileService.ExtractTextFromFile(ctx, file)
+	var file *domain.File
+	file, err = h.fileService.UpdateFileStatusByID(ctx, p.FileID, domain.FileStatusProcessing)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Text extracted: %s\n", text[:50])
+
+	var text string
+	text, err = h.fileService.ExtractTextFromFile(ctx, file)
+	if err != nil {
+		return err
+	}
 
 	file, err = h.fileService.UpdateFileTextContentByID(ctx, p.FileID, text)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Text content updated: %s\n", file.TextContent.String[:50])
 
 	file, err = h.fileService.UpdateFileStatusByID(ctx, p.FileID, domain.FileStatusReady)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("File status updated to ready: %s\n", file.Status)
 
 	return nil
 }
