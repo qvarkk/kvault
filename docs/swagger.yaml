@@ -1,0 +1,307 @@
+basePath: /api/v1
+definitions:
+  handlers.FileResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      s3_key:
+        type: string
+      size:
+        type: integer
+      status:
+        type: string
+    type: object
+  handlers.ItemResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.UserResponse:
+    properties:
+      api_key:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+    type: object
+  handlers.authenticateUserRequest:
+    properties:
+      email:
+        example: example@mail.com
+        type: string
+      password:
+        example: '#strongPwd?123.'
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handlers.createItemRequest:
+    properties:
+      content:
+        example: Some content blah blah.
+        type: string
+      title:
+        example: Example title
+        type: string
+      type:
+        enum:
+        - text
+        - url
+        type: string
+    required:
+    - title
+    - type
+    type: object
+  handlers.registerUserRequest:
+    properties:
+      email:
+        example: example@mail.com
+        type: string
+      password:
+        example: '#strongPwd?123.'
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  httpx.ErrorResponse:
+    properties:
+      detail:
+        type: string
+      instance:
+        type: string
+      status:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+      validation:
+        items:
+          $ref: '#/definitions/httpx.ValidationDetails'
+        type: array
+    type: object
+  httpx.ValidationDetails:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+host: 172.21.37.79:6767
+info:
+  contact: {}
+  description: REST API for managing and searching notes and documents
+  title: KVault API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Verifies user credentials
+      parameters:
+      - description: User credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.authenticateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: User authentication
+      tags:
+      - Authentication
+  /auth/me:
+    get:
+      description: Returns authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user data
+      tags:
+      - Authentication
+  /auth/refresh:
+    post:
+      description: Refreshes authenticated user's API key
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Refresh API key
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates a user record in database with given credentials
+        and returns user's information
+      parameters:
+      - description: User credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.UserResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: User registration
+      tags:
+      - Authentication
+  /files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Validates and uploads given file to S3 container,
+        enqueues redis task to process the file
+      parameters:
+      - description: PDF file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.FileResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a PDF file to your vault
+      tags:
+      - Files
+  /items:
+    post:
+      consumes:
+      - application/json
+      description: Creates an item with data passed through body
+      parameters:
+      - description: Item data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ItemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "422":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create an item in your vault
+      tags:
+      - Items
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

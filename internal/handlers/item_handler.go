@@ -19,17 +19,30 @@ type ItemHandler struct {
 }
 
 func NewItemHandler(itemService ItemService) *ItemHandler {
-	return &ItemHandler{itemService: itemService}
+	return &ItemHandler{
+		itemService: itemService,
+	}
 }
 
 type createItemRequest struct {
-	Type       string `json:"type" binding:"required,oneof=text file url"`
-	Title      string `json:"title" binding:"required"`
-	Content    string `json:"content"`
-	FileMetaID string `json:"file_meta_id" binding:"omitempty,uuid4"`
+	Type    string `json:"type" binding:"required,oneof=text url"`
+	Title   string `json:"title" binding:"required" example:"Example title"`
+	Content string `json:"content" example:"Some content blah blah."`
 }
 
-func (h *ItemHandler) Create(ctx *gin.Context) {
+// @Summary      Create an item in your vault
+// @Description  Creates an item with data passed through body
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body createItemRequest true "Item data"
+// @Success      201   {object}  ItemResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items [post]
+func (i *ItemHandler) Create(ctx *gin.Context) {
 	userID := ctx.MustGet("userID").(string)
 
 	var req createItemRequest
@@ -39,18 +52,17 @@ func (h *ItemHandler) Create(ctx *gin.Context) {
 	}
 
 	itemInput := services.CreateItemInput{
-		UserID:     userID,
-		Type:       req.Type,
-		Title:      req.Title,
-		Content:    req.Content,
-		FileMetaID: req.FileMetaID,
+		UserID:  userID,
+		Type:    req.Type,
+		Title:   req.Title,
+		Content: req.Content,
 	}
 
-	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
+	item, err := i.itemService.CreateNew(ctx.Request.Context(), itemInput)
 	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
 		abortOnDbError(ctx, err)
 		return
-	} else if errors.Is(err, services.ErrInternal) {
+	} else if err != nil {
 		abortOnInternalError(ctx, err)
 		return
 	}

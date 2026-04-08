@@ -7,7 +7,7 @@ import (
 )
 
 type Redis struct {
-	Client *asynq.Client
+	AsynqClient *asynq.Client
 }
 
 type Config struct {
@@ -33,6 +33,6 @@ func NewRedis(config Config) (*Redis, error) {
 	}
 
 	return &Redis{
-		Client: client,
+		AsynqClient: client,
 	}, nil
 }

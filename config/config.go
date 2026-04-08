@@ -8,13 +8,15 @@ import (
 type Config struct {
 	Debug bool `default:"false"`
 
-	Api   ApiConfig
-	DB    DBConfig
-	Redis RedisConfig
+	Api    ApiConfig
+	DB     DBConfig
+	Redis  RedisConfig
+	Aws    AwsConfig
+	Worker WorkerConfig
 }
 
 type ApiConfig struct {
-	Port int `envconfig:"PORT" default:"8080"`
+	Port int `default:"8080"`
 }
 
 type DBConfig struct {
@@ -30,6 +32,18 @@ type RedisConfig struct {
 	Port     int    `default:"6379"`
 	User     string `required:"true"`
 	Password string `required:"true"`
+}
+
+type AwsConfig struct {
+	AccessKeyID     string `envconfig:"ACCESS_KEY_ID"`
+	SecretAccessKey string `envconfig:"SECRET_ACCESS_KEY"`
+	Region          string `envconfig:"REGION"`
+	EndpointUrl     string `envconfig:"ENDPOINT_URL"`
+	S3Bucket        string `envconfig:"S3_BUCKET"`
+}
+
+type WorkerConfig struct {
+	ConcurrentTasks int `default:"10"`
 }
 
 func LoadConfig() (*Config, error) {

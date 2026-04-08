@@ -1,4 +1,6 @@
 *.log
 .env
+.awsrc
 .vscode
 tmp
+bin

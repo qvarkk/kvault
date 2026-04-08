@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"qvarkk/kvault/config"
+	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
@@ -16,13 +17,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// @title           KVault API
+// @version         1.0
+// @description     REST API for managing and searching notes and documents
+// @host            172.21.37.79:6767
+// @BasePath        /api/v1
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	err = logger.Init(config.Debug)
+	err = logger.Init("api", config.Debug)
 	if err != nil {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
@@ -53,30 +63,41 @@ func main() {
 		DB:       0,
 	}
 
-	_, err = redis.NewRedis(redisConfig)
+	redis, err := redis.NewRedis(redisConfig)
 	if err != nil {
 		logger.Logger.Fatal("Connection to Redis failed", zap.Error(err))
+	}
+
+	aws, err := aws.NewAws(config.Aws)
+	if err != nil {
+		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
 	}
 
 	var (
 		userRepo = repositories.NewUserRepo(pg.DB)
 		itemRepo = repositories.NewItemRepo(pg.DB)
+		fileRepo = repositories.NewFileRepo(pg.DB)
 	)
 
 	var (
 		authService = services.NewAuthService(userRepo)
 		userService = services.NewUserService(userRepo)
 		itemService = services.NewItemService(itemRepo)
+		fileService = services.NewFileService(fileRepo, redis, aws)
 	)
 
-	services := &routes.Services{
-		AuthService:     authService,
-		AuthUserService: userService,
-		MwUserService:   userService,
-		UserService:     userService,
-		ItemService:     itemService,
+	hs := &routes.HandlerServices{
+		Auth:     authService,
+		AuthUser: userService,
+		User:     userService,
+		Item:     itemService,
+		File:     fileService,
 	}
 
-	r := routes.SetupRouter(services)
+	ms := &routes.MiddlewareServices{
+		User: userService,
+	}
+
+	r := routes.SetupRouter(hs, ms)
 	r.Run(fmt.Sprintf(":%d", config.Api.Port))
 }
