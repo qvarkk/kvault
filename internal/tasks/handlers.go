@@ -1,7 +1,6 @@
 package tasks
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,8 +9,7 @@ import (
 )
 
 type FileTaskService interface {
-	GetPdfFileFromS3(context.Context, string) (*bytes.Buffer, error)
-	ConvertPDFToPlainText(context.Context, *bytes.Reader) (string, error)
+	ExtractTextFromS3(context.Context, string) (string, error)
 }
 
 type FileTaskHandler struct {
@@ -30,12 +28,7 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 		return err
 	}
 
-	file, err := h.fileService.GetPdfFileFromS3(ctx, p.FileID)
-	if err != nil {
-		return err
-	}
-
-	text, err := h.fileService.ConvertPDFToPlainText(ctx, bytes.NewReader(file.Bytes()))
+	text, err := h.fileService.ExtractTextFromS3(ctx, p.FileID)
 	if err != nil {
 		return err
 	}

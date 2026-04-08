@@ -3,8 +3,11 @@ package services
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
+	"strings"
 
 	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -27,10 +30,10 @@ func NewFileTaskService(fileRepo FileTaskRepo, aws *aws.Aws) *FileTaskService {
 	}
 }
 
-func (s *FileTaskService) GetPdfFileFromS3(ctx context.Context, fileID string) (*bytes.Buffer, error) {
+func (s *FileTaskService) ExtractTextFromS3(ctx context.Context, fileID string) (string, error) {
 	file, err := s.fileRepo.GetByID(ctx, fileID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	resp, err := s.aws.S3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -38,19 +41,35 @@ func (s *FileTaskService) GetPdfFileFromS3(ctx context.Context, fileID string) (
 		Key:    awsSdk.String(file.S3Key),
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(resp.Body)
-	return buf, nil
-}
-
-func (s *FileTaskService) ConvertPDFToPlainText(ctx context.Context, reader *bytes.Reader) (string, error) {
-	r, err := pdf.NewReader(reader, reader.Size())
+	tmpFile, err := os.CreateTemp("", "*.pdf")
 	if err != nil {
-		return "", nil
+		return "", err
+	}
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = io.Copy(tmpFile, resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = tmpFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", err
+	}
+
+	fileInfo, err := tmpFile.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	r, err := pdf.NewReader(tmpFile, fileInfo.Size())
+	if err != nil {
+		return "", err
 	}
 
 	var buf bytes.Buffer
@@ -60,5 +79,12 @@ func (s *FileTaskService) ConvertPDFToPlainText(ctx context.Context, reader *byt
 	}
 
 	_, err = buf.ReadFrom(b)
-	return buf.String(), err
+	if err != nil {
+		return "", err
+	}
+
+	rawText := buf.String()
+	words := strings.Fields(rawText)
+	normalizedText := strings.Join(words, " ")
+	return normalizedText, nil
 }
