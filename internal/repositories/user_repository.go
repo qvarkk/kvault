@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"qvarkk/kvault/internal/domain"
 
@@ -50,15 +49,17 @@ func NewUserRepo(db *sqlx.DB) *UserRepo {
 }
 
 func (r *UserRepo) CreateNew(ctx context.Context, user *domain.User) error {
-	return r.db.QueryRowxContext(ctx, createUserQuery, user.Email, user.Password, user.APIKey).
+	err := r.db.QueryRowxContext(ctx, createUserQuery, user.Email, user.Password, user.APIKey).
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	return toRepositoryError(err)
 }
 
 func (r *UserRepo) IsApiKeyUnique(ctx context.Context, apiKey string) (bool, error) {
 	var exists bool
 
 	err := r.db.Get(&exists, isApiKeyUniqueQuery, apiKey)
-	if errors.Is(err, sql.ErrNoRows) {
+	err = toRepositoryError(err)
+	if errors.Is(err, ErrNotFound) {
 		return true, nil
 	}
 
@@ -81,7 +82,7 @@ func (r *UserRepo) GetByApiKey(ctx context.Context, apiKey string) (*domain.User
 func (r *UserRepo) UpdateApiKey(ctx context.Context, userID string, apiKey string) (*domain.User, error) {
 	var user domain.User
 	err := r.db.GetContext(ctx, &user, updateApiKeyQuery, apiKey, userID)
-	return &user, err
+	return &user, toRepositoryError(err)
 }
 
 func (r *UserRepo) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
@@ -97,12 +98,5 @@ func (r *UserRepo) getByField(ctx context.Context, field string, value string) (
 
 	var user domain.User
 	err := r.db.GetContext(ctx, &user, query, value)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	return &user, nil
+	return &user, toRepositoryError(err)
 }

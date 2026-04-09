@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
@@ -47,28 +46,22 @@ type uploadFileForm struct {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /files/upload [post]
-func (f *FileHandler) UploadFile(ctx *gin.Context) {
+func (f *FileHandler) UploadFile(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var form uploadFileForm
 	if err := ctx.ShouldBind(&form); err != nil {
-		abortOnBindError(ctx, err)
-		return
+		return err
 	}
 
 	err := f.fileService.ValidatePdfFile(ctx, form.File)
-	if errors.Is(err, services.ErrPdfFileFormat) {
-		abortWithPublicError(ctx, err, "Failed to validate PDF file.")
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+	if err != nil {
+		return err
 	}
 
 	s3Key, err := f.fileService.UploadPdfFileToS3(ctx, form.File)
 	if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+		return err
 	}
 
 	fileInput := services.CreateFileInput{
@@ -81,12 +74,8 @@ func (f *FileHandler) UploadFile(ctx *gin.Context) {
 	}
 
 	file, err := f.fileService.CreateNew(ctx.Request.Context(), fileInput)
-	if errors.Is(err, services.ErrItemNotCreated) || file == nil {
-		abortOnDbError(ctx, err)
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+	if err != nil {
+		return err
 	}
 
 	payload := tasks.PdfProcessPayload{
@@ -96,9 +85,9 @@ func (f *FileHandler) UploadFile(ctx *gin.Context) {
 
 	_, err = f.fileService.EnqueuePdfProcessTask(ctx, payload)
 	if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+		return err
 	}
 
 	ctx.JSON(http.StatusCreated, toFileResponse(file))
+	return nil
 }

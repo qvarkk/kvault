@@ -2,8 +2,6 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
@@ -36,7 +34,7 @@ const updateTextContentQuery = `
 `
 
 func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
-	return r.db.QueryRowxContext(
+	err := r.db.QueryRowxContext(
 		ctx,
 		createFileMetaQuery,
 		file.UserID,
@@ -46,19 +44,13 @@ func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 		file.Status,
 	).
 		StructScan(file)
+	return toRepositoryError(err)
 }
 
 func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, error) {
 	var file domain.File
 	err := r.db.GetContext(ctx, &file, getFileByIDQuery, fileID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	return &file, nil
+	return &file, toRepositoryError(err)
 }
 
 // Updates status and returns updated file
@@ -69,9 +61,10 @@ func (r *FileRepo) UpdateStatusByID(
 ) (*domain.File, error) {
 	var file domain.File
 	err := r.db.GetContext(ctx, &file, updateStatusQuery, fileID, status)
-	return &file, err
+	return &file, toRepositoryError(err)
 }
 
+// Updates text content and returns updated file
 func (r *FileRepo) UpdateTextContentByID(
 	ctx context.Context,
 	fileID string,
@@ -79,5 +72,5 @@ func (r *FileRepo) UpdateTextContentByID(
 ) (*domain.File, error) {
 	var file domain.File
 	err := r.db.GetContext(ctx, &file, updateTextContentQuery, fileID, textContent)
-	return &file, err
+	return &file, toRepositoryError(err)
 }

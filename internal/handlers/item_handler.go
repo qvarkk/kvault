@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
@@ -42,13 +41,12 @@ type createItemRequest struct {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items [post]
-func (i *ItemHandler) Create(ctx *gin.Context) {
+func (i *ItemHandler) Create(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var req createItemRequest
 	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(ctx, err)
-		return
+		return err
 	}
 
 	itemInput := services.CreateItemInput{
@@ -59,13 +57,10 @@ func (i *ItemHandler) Create(ctx *gin.Context) {
 	}
 
 	item, err := i.itemService.CreateNew(ctx.Request.Context(), itemInput)
-	if errors.Is(err, services.ErrItemNotCreated) || item == nil {
-		abortOnDbError(ctx, err)
-		return
-	} else if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+	if err != nil {
+		return err
 	}
 
 	ctx.JSON(http.StatusCreated, toItemResponse(item))
+	return nil
 }

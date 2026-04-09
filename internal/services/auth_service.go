@@ -69,6 +69,9 @@ func (a *AuthService) RegisterNewUser(
 
 	err = a.userRepo.CreateNew(ctx, user)
 	if err != nil {
+		if errors.Is(err, repositories.ErrAlreadyExists) {
+			return nil, NewServiceError(ErrUserAlreadyExists, "user already exists", err)
+		}
 		return nil, NewServiceError(ErrUserNotCreated, "database error", err)
 	}
 
@@ -84,14 +87,14 @@ func (a *AuthService) VerifyCredentials(
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to find user %s", email)
 		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, NewServiceError(ErrUserNotFound, errMsg, err)
+			return nil, NewServiceError(ErrInvalidCredentials, errMsg, err)
 		}
 		return nil, NewServiceError(ErrInternal, errMsg, err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, NewServiceError(ErrInternal, "failed to compare password hashes", err)
+		return nil, NewServiceError(ErrInvalidCredentials, "failed to compare password hashes", err)
 	}
 
 	return user, nil

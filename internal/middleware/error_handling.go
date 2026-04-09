@@ -1,11 +1,13 @@
 package middleware
 
 import (
-	"net/http"
+	"errors"
 	"qvarkk/kvault/internal/httpx"
+	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/logger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 )
 
@@ -17,32 +19,37 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		publicErrs := c.Errors.ByType(gin.ErrorTypePublic)
-		if len(publicErrs) > 0 {
-			lastErr := publicErrs.Last().Err
-			if httpErr, ok := lastErr.(*httpx.PublicError); ok {
-				errResponse := httpErr.ToErrorResponse(c.FullPath())
-				c.AbortWithStatusJSON(errResponse.Status, errResponse)
-			} else {
-				errResponse := httpx.NewErrorResponse(
-					http.StatusInternalServerError,
-					c.FullPath(),
-					httpx.ErrInternalServer.Error(),
-					nil,
-				)
-				c.AbortWithStatusJSON(errResponse.Status, errResponse)
+		err := c.Errors.Last().Err
+
+		var publicErr *httpx.PublicError
+		var serviceErr *services.ServiceError
+		var validationErr validator.ValidationErrors
+
+		switch {
+		case errors.As(err, &publicErr):
+
+		case errors.As(err, &serviceErr):
+			publicErr = httpx.MapErrorToPublic(err)
+		case errors.As(err, &validationErr):
+			publicErr = &httpx.PublicError{
+				Err:              httpx.ErrUnprocessableEntity,
+				ValidationErrors: validationErr,
+			}
+		default:
+			publicErr = &httpx.PublicError{
+				Err: httpx.ErrInternalServer,
 			}
 		}
 
-		privateErr := c.Errors.ByType(gin.ErrorTypePrivate)
-		for _, err := range privateErr {
-			// TODO: might be a good idea to bring in something like sentry
-			logger.Logger.Error("private error",
+		for _, ginErr := range c.Errors {
+			logger.Logger.Error("request error",
 				zap.String("path", c.FullPath()),
-				zap.String("client_ip", c.ClientIP()),
 				zap.String("method", c.Request.Method),
-				zap.String("err", err.Err.Error()),
+				zap.Error(ginErr.Err),
 			)
 		}
+
+		errResponse := publicErr.ToErrorResponse(c.FullPath())
+		c.AbortWithStatusJSON(errResponse.Status, errResponse)
 	}
 }

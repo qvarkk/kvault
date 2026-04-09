@@ -22,6 +22,19 @@ func NewUserService(userRepo UserRepo) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
+func (u *UserService) Authenticate(ctx context.Context, apiKey string) (*domain.User, error) {
+	user, err := u.GetByApiKey(ctx, apiKey)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to authenticate user with API key = %s", apiKey)
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, NewServiceError(ErrUnauthenticated, errMsg, err)
+		}
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (u *UserService) GetByID(ctx context.Context, userID string) (*domain.User, error) {
 	return u.getByField(ctx, repositories.UserFieldID, userID)
 }

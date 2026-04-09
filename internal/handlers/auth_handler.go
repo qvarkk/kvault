@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,23 +52,19 @@ func NewAuthHandler(authService AuthService, userService AuthUserService) *AuthH
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/register [post]
-func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
+func (h *AuthHandler) RegisterUser(ctx *gin.Context) error {
 	var req registerUserRequest
 	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(ctx, err)
-		return
+		return err
 	}
 
 	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Email, req.Password)
-	if errors.Is(err, services.ErrUserNotCreated) {
-		abortOnDbError(ctx, err)
-		return
-	} else if errors.Is(err, services.ErrInternal) {
-		abortOnInternalError(ctx, err)
-		return
+	if err != nil {
+		return err
 	}
 
 	ctx.JSON(http.StatusCreated, toUserResponseWithApiKey(user))
+	return nil
 }
 
 // @Summary      User authentication
@@ -84,20 +78,19 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/login [post]
-func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
+func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) error {
 	var req authenticateUserRequest
 	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
-		abortOnBindError(ctx, err)
-		return
+		return err
 	}
 
 	user, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		abortUnauthorized(ctx)
-		return
+		return err
 	}
 
 	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	return nil
 }
 
 // @Summary      Get user data
@@ -109,16 +102,16 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) {
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/me [get]
-func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
+func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	user, err := h.userService.GetByID(ctx.Request.Context(), userID)
 	if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+		return err
 	}
 
 	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	return nil
 }
 
 // @Summary      Refresh API key
@@ -130,14 +123,14 @@ func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) {
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /auth/refresh [post]
-func (h *AuthHandler) RotateApiKey(ctx *gin.Context) {
+func (h *AuthHandler) RotateApiKey(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	user, err := h.authService.RotateApiKey(ctx, userID)
 	if err != nil {
-		abortOnInternalError(ctx, err)
-		return
+		return err
 	}
 
 	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	return nil
 }

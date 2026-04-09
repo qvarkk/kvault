@@ -81,7 +81,7 @@ func (f *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart
 
 	contentType := http.DetectContentType(buffer[:n])
 	if contentType != "application/pdf" {
-		return NewServiceError(ErrPdfFileFormat, "File should be of a PDF content type.", nil)
+		return NewServiceError(ErrPdfFileFormat, "invalid file content type", nil)
 	}
 
 	return nil

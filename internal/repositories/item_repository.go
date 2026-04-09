@@ -22,6 +22,7 @@ const createItemQuery = `
 `
 
 func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	return i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content).
+	err := i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content).
 		StructScan(item)
+	return toRepositoryError(err)
 }

@@ -42,26 +42,26 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 
 func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.AuthHandler) {
 	group := api.Group("/auth")
-	group.POST("/register", h.RegisterUser)
-	group.POST("/login", h.AuthenticateUser)
+	group.POST("/register", handlers.APIWrap(h.RegisterUser))
+	group.POST("/login", handlers.APIWrap(h.AuthenticateUser))
 
 	protected := group.Group("/", auth)
-	protected.GET("/me", h.GetAuthenticatedUser)
-	protected.POST("/refresh", h.RotateApiKey)
+	protected.GET("/me", handlers.APIWrap(h.GetAuthenticatedUser))
+	protected.POST("/refresh", handlers.APIWrap(h.RotateApiKey))
 }
 
 func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.UserHandler) {
 	group := api.Group("/users", auth)
 	// TODO: RBAC, fix the idea that /users route only gets user by email lol
-	group.GET("", h.GetByEmail)
+	group.GET("", handlers.APIWrap(h.GetByEmail))
 }
 
 func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.ItemHandler) {
 	group := api.Group("/items", auth)
-	group.POST("", h.Create)
+	group.POST("", handlers.APIWrap(h.Create))
 }
 
 func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.FileHandler) {
 	group := api.Group("/files", auth)
-	group.POST("/upload", h.UploadFile)
+	group.POST("/upload", handlers.APIWrap(h.UploadFile))
 }
