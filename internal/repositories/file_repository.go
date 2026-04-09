@@ -26,11 +26,11 @@ const getFileByIDQuery = `
 `
 
 const updateStatusQuery = `
-	UPDATE files SET status=$2 WHERE id=$1 RETURNING *
+	UPDATE files SET status=$2, updated_at=now() WHERE id=$1 RETURNING *
 `
 
 const updateTextContentQuery = `
-	UPDATE files SET text_content=$2 WHERE id=$1 RETURNING *
+	UPDATE files SET text_content=$2, updated_at=now() WHERE id=$1 RETURNING *
 `
 
 func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {

@@ -37,7 +37,7 @@ const getUserByApiKeyQuery = `
 `
 
 const updateApiKeyQuery = `
-	UPDATE users SET api_key=$1 WHERE id=$2 RETURNING *
+	UPDATE users SET api_key=$1, updated_at=$2 WHERE id=$2 RETURNING *
 `
 
 type UserRepo struct {
