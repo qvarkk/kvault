@@ -21,8 +21,18 @@ const createItemQuery = `
 	RETURNING *
 `
 
+const getByIdQuery = `
+	SELECT * FROM items WHERE id=$1
+`
+
 func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	err := i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content).
 		StructScan(item)
 	return toRepositoryError(err)
+}
+
+func (i *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
+	var item domain.Item
+	err := i.db.GetContext(ctx, &item, getByIdQuery, itemID)
+	return &item, toRepositoryError(err)
 }

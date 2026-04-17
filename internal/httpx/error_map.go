@@ -19,6 +19,13 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
+		target: services.ErrForbidden,
+		public: &PublicError{
+			Err:     ErrForbidden,
+			Message: "Access forbidden.",
+		},
+	},
+	{
 		target: services.ErrInvalidCredentials,
 		public: &PublicError{
 			Err:     ErrUnauthorized,
@@ -33,17 +40,24 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
-		target: services.ErrPdfFileFormat,
-		public: &PublicError{
-			Err:     ErrUnprocessableEntity,
-			Message: "File should be of a PDF content type.",
-		},
-	},
-	{
 		target: services.ErrUserAlreadyExists,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
 			Message: "User with this email already exists.",
+		},
+	},
+	{
+		target: services.ErrItemNotFound,
+		public: &PublicError{
+			Err:     ErrNotFound,
+			Message: "Item with given ID does not exist.",
+		},
+	},
+	{
+		target: services.ErrPdfFileFormat,
+		public: &PublicError{
+			Err:     ErrUnprocessableEntity,
+			Message: "File should be of a PDF content type.",
 		},
 	},
 }

@@ -6,12 +6,14 @@ import (
 
 var (
 	ErrInternal           = errors.New("services: internal error")
+	ErrForbidden          = errors.New("services: access forbidden")
 	ErrUnauthenticated    = errors.New("services: unauthenticated")
 	ErrInvalidCredentials = errors.New("services: invalid credentials")
 	ErrUserNotCreated     = errors.New("services: failed to create user")
 	ErrUserAlreadyExists  = errors.New("services: user already exists")
 	ErrUserNotFound       = errors.New("services: user was not found")
 	ErrItemNotCreated     = errors.New("service: failed to create item")
+	ErrItemNotFound       = errors.New("service: item was not found")
 	ErrFileNotCreated     = errors.New("service: failed to create file")
 	ErrPdfFileFormat      = errors.New("services: provided file has to be a PDF file")
 )

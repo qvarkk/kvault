@@ -10,6 +10,7 @@ import (
 var (
 	ErrBadRequest          = errors.New("One or more fields have validation errors. Please check and try again.")
 	ErrUnauthorized        = errors.New("Wrong credentials. Please check and try again.")
+	ErrForbidden           = errors.New("Access to the requested entity is forbidden.")
 	ErrNotFound            = errors.New("The requested resource was not found.")
 	ErrUnprocessableEntity = errors.New("The request could not be processed. Please check your input.")
 	ErrInternalServer      = errors.New("An internal server error occurred.")
@@ -18,6 +19,7 @@ var (
 var errorStatusMap = map[error]int{
 	ErrBadRequest:          http.StatusBadRequest,
 	ErrUnauthorized:        http.StatusUnauthorized,
+	ErrForbidden:           http.StatusForbidden,
 	ErrNotFound:            http.StatusNotFound,
 	ErrUnprocessableEntity: http.StatusUnprocessableEntity,
 	ErrInternalServer:      http.StatusInternalServerError,
