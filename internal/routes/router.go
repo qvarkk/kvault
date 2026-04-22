@@ -59,6 +59,7 @@ func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.
 func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.ItemHandler) {
 	group := api.Group("/items", auth)
 	group.POST("", handlers.APIWrap(h.Create))
+	group.GET("", handlers.APIWrap(h.List))
 	group.GET("/:id", handlers.APIWrap(h.Get))
 }
 

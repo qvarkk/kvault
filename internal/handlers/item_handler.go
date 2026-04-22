@@ -11,6 +11,7 @@ import (
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
+	List(context.Context, services.ListItemParams) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 }
 
@@ -28,6 +29,13 @@ type createItemRequest struct {
 	Type    string `json:"type" binding:"required,oneof=text url"`
 	Title   string `json:"title" binding:"required" example:"Example title"`
 	Content string `json:"content" example:"Some content blah blah."`
+}
+
+type listItemRequest struct {
+	Query string `form:"q"`
+	Type  string `form:"type" binding:"omitempty,oneof=text url"`
+	PaginationParams
+	ItemSortingParams
 }
 
 type getItemUri struct {
@@ -67,6 +75,50 @@ func (i *ItemHandler) Create(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusCreated, toItemResponse(item))
+	return nil
+}
+
+// @Summary      Get all items
+// @Description  Returns a list of items owned by the User
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param				 params query listItemRequest false "Query parameters"
+// @Success      200   {object}  ItemResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items [get]
+func (i *ItemHandler) List(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var req listItemRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		return err
+	}
+
+	params := services.ListItemParams{
+		UserID:    userID,
+		Query:     req.Query,
+		Type:      req.Type,
+		Page:      req.Page,
+		PageSize:  req.PageSize,
+		Direction: req.Direction,
+		Column:    req.Column,
+	}
+
+	items, total, err := i.itemService.List(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	itemResponses := make([]ItemResponse, len(items))
+	for i, item := range items {
+		itemResponses[i] = toItemResponse(&item)
+	}
+
+	ctx.JSON(http.StatusOK, toPaginatedResponse(itemResponses, total, params.Page, params.PageSize))
 	return nil
 }
 

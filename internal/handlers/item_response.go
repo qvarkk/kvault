@@ -12,6 +12,7 @@ type ItemResponse struct {
 	Title     string `json:"title"`
 	Content   string `json:"content,omitempty"`
 	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 func toItemResponse(item *domain.Item) ItemResponse {
@@ -22,5 +23,6 @@ func toItemResponse(item *domain.Item) ItemResponse {
 		Title:     item.Title,
 		Content:   item.Content.String,
 		CreatedAt: item.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: item.UpdatedAt.Format(time.RFC3339),
 	}
 }

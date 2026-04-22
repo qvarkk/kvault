@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/internal/repositories"
 )
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
+	List(context.Context, repositories.ListItemParams) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
 }
 
@@ -20,6 +22,8 @@ type CreateItemInput struct {
 	Title   string
 	Content string
 }
+
+type ListItemParams repositories.ListItemParams
 
 func NewItemService(itemRepo ItemRepo) *ItemService {
 	return &ItemService{
@@ -41,6 +45,14 @@ func (i *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	}
 
 	return item, nil
+}
+
+func (i *ItemService) List(ctx context.Context, params ListItemParams) ([]domain.Item, int, error) {
+	items, count, err := i.itemRepo.List(ctx, repositories.ListItemParams(params))
+	if err != nil {
+		return nil, 0, NewServiceError(ErrInternal, "internal error", err)
+	}
+	return items, count, nil
 }
 
 func (i *ItemService) GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error) {
