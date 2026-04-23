@@ -33,6 +33,8 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 		return err
 	}
 
+	logger.Logger.Info("Starting extracting text content", zap.String("file_id", p.FileID))
+
 	defer func() {
 		if err != nil && p.FileID != "" {
 			_, updateErr := h.fileService.UpdateFileStatusByID(context.Background(), p.FileID, domain.FileStatusError)
@@ -67,6 +69,8 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 	if err != nil {
 		return err
 	}
+
+	logger.Logger.Info("Successfully extracted text content", zap.String("file_id", file.ID))
 
 	return nil
 }
