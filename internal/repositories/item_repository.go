@@ -21,25 +21,29 @@ type ListItemParams struct {
 }
 
 type ItemRepo struct {
-	db *sqlx.DB
+	db           *sqlx.DB
+	queryBuilder sq.StatementBuilderType
 }
 
 func NewItemRepo(db *sqlx.DB) *ItemRepo {
-	return &ItemRepo{db: db}
+	builder := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	return &ItemRepo{
+		db:           db,
+		queryBuilder: builder,
+	}
 }
 
-const createItemQuery = `
-	INSERT INTO items (user_id, type, title, content)
-	VALUES ($1, $2, $3, $4)
-	RETURNING *
-`
-
-const getByIdQuery = `
-	SELECT * FROM items WHERE id=$1
-`
-
 func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	err := i.db.QueryRowxContext(ctx, createItemQuery, item.UserID, item.Type, item.Title, item.Content).
+	sql, args, err := i.queryBuilder.
+		Insert("items").Columns("user_id", "type", "title", "content").
+		Values(item.UserID, item.Type, item.Title, item.Content).
+		Suffix("RETURNING *").ToSql()
+	if err != nil {
+		return err
+	}
+
+	err = i.db.QueryRowxContext(ctx, sql, args...).
 		StructScan(item)
 	return toRepositoryError(err)
 }
@@ -48,10 +52,8 @@ func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 	var items []domain.Item
 	var count int
 
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-
 	offset := uint64(params.PageSize * (params.Page - 1))
-	baseQuery := psql.
+	baseQuery := i.queryBuilder.
 		Select().
 		From("items").
 		Where(sq.Eq{"user_id": params.UserID})
@@ -111,7 +113,14 @@ func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 }
 
 func (i *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
+	sql, args, err := i.queryBuilder.
+		Select("*").From("items").
+		Where(sq.Eq{"id": itemID}).ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
 	var item domain.Item
-	err := i.db.GetContext(ctx, &item, getByIdQuery, itemID)
+	err = i.db.GetContext(ctx, &item, sql, args...)
 	return &item, toRepositoryError(err)
 }
