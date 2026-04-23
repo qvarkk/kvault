@@ -34,8 +34,8 @@ func NewItemRepo(db *sqlx.DB) *ItemRepo {
 	}
 }
 
-func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	sql, args, err := i.queryBuilder.
+func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
+	sql, args, err := r.queryBuilder.
 		Insert("items").Columns("user_id", "type", "title", "content").
 		Values(item.UserID, item.Type, item.Title, item.Content).
 		Suffix("RETURNING *").ToSql()
@@ -43,17 +43,16 @@ func (i *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 		return err
 	}
 
-	err = i.db.QueryRowxContext(ctx, sql, args...).
-		StructScan(item)
+	err = r.db.QueryRowxContext(ctx, sql, args...).StructScan(item)
 	return toRepositoryError(err)
 }
 
-func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
 	offset := uint64(params.PageSize * (params.Page - 1))
-	baseQuery := i.queryBuilder.
+	baseQuery := r.queryBuilder.
 		Select().
 		From("items").
 		Where(sq.Eq{"user_id": params.UserID})
@@ -88,7 +87,7 @@ func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		if err := i.db.SelectContext(ctx, &items, itemsQuerySql, itemsArgs...); err != nil {
+		if err := r.db.SelectContext(ctx, &items, itemsQuerySql, itemsArgs...); err != nil {
 			cancel(err)
 			return err
 		}
@@ -96,7 +95,7 @@ func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 	})
 
 	g.Go(func() error {
-		if err := i.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
+		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
 			cancel(err)
 			return err
 		}
@@ -112,8 +111,8 @@ func (i *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 	return items, count, nil
 }
 
-func (i *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
-	sql, args, err := i.queryBuilder.
+func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
+	sql, args, err := r.queryBuilder.
 		Select("*").From("items").
 		Where(sq.Eq{"id": itemID}).ToSql()
 	if err != nil {
@@ -121,6 +120,6 @@ func (i *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, er
 	}
 
 	var item domain.Item
-	err = i.db.GetContext(ctx, &item, sql, args...)
+	err = r.db.GetContext(ctx, &item, sql, args...)
 	return &item, toRepositoryError(err)
 }
