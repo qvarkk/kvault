@@ -35,11 +35,12 @@ type RedisConfig struct {
 }
 
 type AwsConfig struct {
-	AccessKeyID     string `envconfig:"ACCESS_KEY_ID"`
-	SecretAccessKey string `envconfig:"SECRET_ACCESS_KEY"`
-	Region          string `envconfig:"REGION"`
-	EndpointUrl     string `envconfig:"ENDPOINT_URL"`
-	S3Bucket        string `envconfig:"S3_BUCKET"`
+	AccessKeyID              string `envconfig:"ACCESS_KEY_ID"`
+	SecretAccessKey          string `envconfig:"SECRET_ACCESS_KEY"`
+	Region                   string `envconfig:"REGION"`
+	EndpointUrl              string `envconfig:"ENDPOINT_URL"`
+	S3Bucket                 string `envconfig:"S3_BUCKET"`
+	UrlExpirationTimeSeconds int    `envconfig:"URL_EXPIRATION_TIME_SECONDS" default:"60"`
 }
 
 type WorkerConfig struct {

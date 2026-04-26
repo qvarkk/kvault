@@ -15,6 +15,7 @@ import (
 type FileService interface {
 	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
 	List(context.Context, services.ListFileParams) ([]domain.File, int, error)
+	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (string, error)
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
 	UploadPdfFileToS3(context.Context, *multipart.FileHeader) (string, error)
 	EnqueuePdfProcessTask(context.Context, tasks.PdfProcessPayload) (*asynq.TaskInfo, error)
@@ -39,6 +40,10 @@ type listFileRequest struct {
 	MimeType string `form:"mime_type" binding:"omitempty,oneof=application/pdf"`
 	PaginationParams
 	FileSortingParams
+}
+
+type getFileUri struct {
+	ID string `uri:"id" binding:"required,uuid"`
 }
 
 // @Summary      Upload a PDF file to your vault
@@ -141,5 +146,39 @@ func (h *FileHandler) List(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(fileResponses, total, params.Page, params.PageSize))
+	return nil
+}
+
+// @Summary      Get a file from user's vault
+// @Description  Gets a file by ID
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "File ID"
+// TODO: in swagger it returns 200 with a link that downloads a stream for some reason
+// <a href="blob:http://172.21.37.79:6767/544fdbc0-0e22-4a56-8263-7656ae757360" download="application/octet-stream:cb776e5c-ce8b-41a8-921d-4bd41d7a189e:blob:http://172.21.37.79:6767/544fdbc0-0e22-4a56-8263-7656ae757360">Download file</a>
+// @Success      302   {string}  string  "Redirecting to the new destination"
+// @Header       302   {string}  Location "The URL of the destination page"
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      403   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/{id} [get]
+func (h *FileHandler) Download(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri getFileUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	url, err := h.fileService.GetFilePresignedUrl(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Redirect(http.StatusFound, url)
 	return nil
 }

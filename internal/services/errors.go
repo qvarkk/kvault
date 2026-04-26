@@ -15,6 +15,7 @@ var (
 	ErrItemNotCreated     = errors.New("service: failed to create item")
 	ErrItemNotFound       = errors.New("service: item was not found")
 	ErrFileNotCreated     = errors.New("service: failed to create file")
+	ErrFileNotFound       = errors.New("service: file was not found")
 	ErrPdfFileFormat      = errors.New("services: provided file has to be a PDF file")
 )
 

@@ -2,14 +2,17 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/tasks"
+	"time"
 
 	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -20,6 +23,7 @@ import (
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
 	List(context.Context, repositories.ListFileParams) ([]domain.File, int, error)
+	GetByID(context.Context, string) (*domain.File, error)
 }
 
 type FileService struct {
@@ -71,6 +75,31 @@ func (s *FileService) List(ctx context.Context, params ListFileParams) ([]domain
 		return nil, 0, NewServiceError(ErrInternal, "list files internal error", err)
 	}
 	return files, count, err
+}
+
+func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID string) (string, error) {
+	file, err := s.fileRepo.GetByID(ctx, fileID)
+	if err != nil {
+		return "", NewServiceError(ErrFileNotFound, "not found", err)
+	}
+
+	if file.UserID != userID {
+		return "", NewServiceError(ErrFileNotFound, "forbidden", nil)
+	}
+
+	presignClient := s3.NewPresignClient(s.aws.S3Client)
+	contentDispositionParam := fmt.Sprintf(
+		"attachment; filename*=UTF-8''%s",
+		url.PathEscape(file.OriginalName),
+	)
+
+	presignedResult, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     awsSdk.String(s.aws.BucketName),
+		Key:                        awsSdk.String(file.S3Key),
+		ResponseContentDisposition: awsSdk.String(contentDispositionParam),
+	}, s3.WithPresignExpires(time.Second*time.Duration(s.aws.UrlExpirationTimeSeconds)))
+
+	return presignedResult.URL, nil
 }
 
 func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {

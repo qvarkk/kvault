@@ -14,9 +14,10 @@ const (
 )
 
 type Aws struct {
-	S3Client   *s3.Client
-	BucketName string
-	Prefix     string
+	S3Client                 *s3.Client
+	BucketName               string
+	Prefix                   string
+	UrlExpirationTimeSeconds int
 }
 
 func (a *Aws) GetKey(filename string) string {
@@ -34,8 +35,9 @@ func NewAws(config config.AwsConfig) (*Aws, error) {
 	})
 
 	return &Aws{
-		S3Client:   client,
-		BucketName: config.S3Bucket,
-		Prefix:     uploadsPrefix,
+		S3Client:                 client,
+		BucketName:               config.S3Bucket,
+		Prefix:                   uploadsPrefix,
+		UrlExpirationTimeSeconds: config.UrlExpirationTimeSeconds,
 	}, nil
 }
