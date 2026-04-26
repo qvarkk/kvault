@@ -8,6 +8,7 @@ import (
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/redis"
+	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/tasks"
 
 	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -18,6 +19,7 @@ import (
 
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
+	List(context.Context, repositories.ListFileParams) ([]domain.File, int, error)
 }
 
 type FileService struct {
@@ -35,6 +37,8 @@ type CreateFileInput struct {
 	Status       string
 }
 
+type ListFileParams repositories.ListFileParams
+
 func NewFileService(fileRepo FileRepo, redis *redis.Redis, aws *aws.Aws) *FileService {
 	return &FileService{
 		fileRepo: fileRepo,
@@ -43,7 +47,7 @@ func NewFileService(fileRepo FileRepo, redis *redis.Redis, aws *aws.Aws) *FileSe
 	}
 }
 
-func (f *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
+func (s *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
 	file := &domain.File{
 		UserID:       input.UserID,
 		OriginalName: input.OriginalName,
@@ -53,7 +57,7 @@ func (f *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*do
 		Status:       domain.FileStatus(input.Status),
 	}
 
-	err := f.fileRepo.CreateNew(ctx, file)
+	err := s.fileRepo.CreateNew(ctx, file)
 	if err != nil {
 		return nil, NewServiceError(ErrFileNotCreated, "database error", err)
 	}
@@ -61,7 +65,15 @@ func (f *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*do
 	return file, nil
 }
 
-func (f *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {
+func (s *FileService) List(ctx context.Context, params ListFileParams) ([]domain.File, int, error) {
+	files, count, err := s.fileRepo.List(ctx, repositories.ListFileParams(params))
+	if err != nil {
+		return nil, 0, NewServiceError(ErrInternal, "list files internal error", err)
+	}
+	return files, count, err
+}
+
+func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {
 	ext := filepath.Ext(fileHeader.Filename)
 	if ext != ".pdf" {
 		return NewServiceError(ErrPdfFileFormat, "invalid file extension", nil)
@@ -87,7 +99,7 @@ func (f *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart
 	return nil
 }
 
-func (f *FileService) UploadPdfFileToS3(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+func (s *FileService) UploadPdfFileToS3(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	file, err := fileHeader.Open()
 	if err != nil {
 		return "", err
@@ -95,22 +107,22 @@ func (f *FileService) UploadPdfFileToS3(ctx context.Context, fileHeader *multipa
 	defer file.Close()
 
 	filename := uuid.New().String() + ".pdf"
-	_, err = f.aws.S3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: awsSdk.String(f.aws.BucketName),
-		Key:    awsSdk.String(f.aws.GetKey(filename)),
+	_, err = s.aws.S3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: awsSdk.String(s.aws.BucketName),
+		Key:    awsSdk.String(s.aws.GetKey(filename)),
 		Body:   file,
 	})
 
-	return f.aws.GetKey(filename), err
+	return s.aws.GetKey(filename), err
 }
 
-func (f *FileService) EnqueuePdfProcessTask(ctx context.Context, payload tasks.PdfProcessPayload) (*asynq.TaskInfo, error) {
+func (s *FileService) EnqueuePdfProcessTask(ctx context.Context, payload tasks.PdfProcessPayload) (*asynq.TaskInfo, error) {
 	task, err := tasks.NewPdfProcessTask(payload)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "failed to create PDF processing task", err)
 	}
 
-	info, err := f.redis.AsynqClient.EnqueueContext(ctx, task)
+	info, err := s.redis.AsynqClient.EnqueueContext(ctx, task)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "failed to enqueue PDF processing task", err)
 	}

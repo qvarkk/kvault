@@ -2,11 +2,23 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/sync/errgroup"
 )
+
+type ListFileParams struct {
+	UserID    string
+	Query     string
+	MimeType  string
+	Page      int
+	PageSize  int
+	Direction string
+	Column    string
+}
 
 type FileRepo struct {
 	db           *sqlx.DB
@@ -35,9 +47,75 @@ func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 	return toRepositoryError(err)
 }
 
+func (r *FileRepo) List(ctx context.Context, params ListFileParams) ([]domain.File, int, error) {
+	var files []domain.File
+	var count int
+
+	offset := uint64(params.PageSize * (params.Page - 1))
+	baseQuery := r.queryBuilder.
+		Select().
+		From("files").
+		Where(sq.Eq{"user_id": params.UserID})
+
+	if params.Query != "" {
+		baseQuery = baseQuery.Where("search_vector @@ websearch_to_tsquery('simple', ?)", params.Query)
+	}
+
+	if params.MimeType != "" {
+		baseQuery = baseQuery.Where(sq.Eq{"mime_type": params.MimeType})
+	}
+
+	// TODO: unify orderby with handler somehow, sql injection possible
+	// TODO: refactor repetition in ItemsRepo.List
+	filesQuery := baseQuery.
+		Columns("*").
+		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		Offset(offset).
+		Limit(uint64(params.PageSize))
+	countQuery := baseQuery.Columns("COUNT(*)")
+
+	filesQuerySql, filesArgs, err := filesQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	countQuerySql, countArgs, err := countQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	g, _ := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		if err := r.db.SelectContext(ctx, &files, filesQuerySql, filesArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	_ = g.Wait()
+
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, 0, toRepositoryError(cause)
+	}
+
+	return files, count, nil
+}
+
 func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, error) {
 	sql, args, err := r.queryBuilder.
-		Select("*").From("files").Where(sq.Eq{"id": fileID}).ToSql()
+		Select("*").From("files").
+		Where(sq.Eq{"id": fileID}).ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}

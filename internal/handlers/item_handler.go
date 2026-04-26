@@ -54,7 +54,7 @@ type getItemUri struct {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items [post]
-func (i *ItemHandler) Create(ctx *gin.Context) error {
+func (h *ItemHandler) Create(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var req createItemRequest
@@ -69,7 +69,7 @@ func (i *ItemHandler) Create(ctx *gin.Context) error {
 		Content: req.Content,
 	}
 
-	item, err := i.itemService.CreateNew(ctx.Request.Context(), itemInput)
+	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (i *ItemHandler) Create(ctx *gin.Context) error {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items [get]
-func (i *ItemHandler) List(ctx *gin.Context) error {
+func (h *ItemHandler) List(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var req listItemRequest
@@ -108,7 +108,7 @@ func (i *ItemHandler) List(ctx *gin.Context) error {
 		Column:    req.Column,
 	}
 
-	items, total, err := i.itemService.List(ctx, params)
+	items, total, err := h.itemService.List(ctx, params)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (i *ItemHandler) List(ctx *gin.Context) error {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{id} [get]
-func (i *ItemHandler) Get(ctx *gin.Context) error {
+func (h *ItemHandler) Get(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var uri getItemUri
@@ -144,7 +144,7 @@ func (i *ItemHandler) Get(ctx *gin.Context) error {
 		return err
 	}
 
-	item, err := i.itemService.GetByID(ctx.Request.Context(), uri.ID, userID)
+	item, err := h.itemService.GetByID(ctx.Request.Context(), uri.ID, userID)
 	if err != nil {
 		return err
 	}

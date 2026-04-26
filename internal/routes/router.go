@@ -66,4 +66,5 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.
 func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.FileHandler) {
 	group := api.Group("/files", auth)
 	group.POST("/upload", handlers.APIWrap(h.UploadFile))
+	group.GET("", handlers.APIWrap(h.List))
 }

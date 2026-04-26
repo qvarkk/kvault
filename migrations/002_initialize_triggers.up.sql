@@ -12,7 +12,9 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION update_search_vector_files()
 RETURNS trigger AS $$
 BEGIN
-  NEW.search_vector := to_tsvector('simple', coalesce(NEW.text_content, ''));
+  NEW.search_vector := 
+    setweight(to_tsvector('simple', coalesce(NEW.original_name, '')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(NEW.text_content, '')), 'B');
 
   RETURN NEW;
 END;
