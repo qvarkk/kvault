@@ -54,6 +54,13 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
+		target: services.ErrFileNotFound,
+		public: &PublicError{
+			Err:     ErrNotFound,
+			Message: "File with given ID does not exist.",
+		},
+	},
+	{
 		target: services.ErrPdfFileFormat,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
