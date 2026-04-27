@@ -77,14 +77,14 @@ func (s *FileService) List(ctx context.Context, params ListFileParams) ([]domain
 	return files, count, err
 }
 
-func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID string) (string, error) {
+func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error) {
 	file, err := s.fileRepo.GetByID(ctx, fileID)
 	if err != nil {
-		return "", NewServiceError(ErrFileNotFound, "not found", err)
+		return nil, NewServiceError(ErrFileNotFound, "not found", err)
 	}
 
 	if file.UserID != userID {
-		return "", NewServiceError(ErrFileNotFound, "forbidden", nil)
+		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
 	}
 
 	presignClient := s3.NewPresignClient(s.aws.S3Client)
@@ -99,7 +99,15 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 		ResponseContentDisposition: awsSdk.String(contentDispositionParam),
 	}, s3.WithPresignExpires(time.Second*time.Duration(s.aws.UrlExpirationTimeSeconds)))
 
-	return presignedResult.URL, nil
+	expiresAt := time.Now().UTC().Add(time.Second * time.Duration(s.aws.UrlExpirationTimeSeconds))
+
+	return &domain.PresignedURL{
+		URL:       presignedResult.URL,
+		Filename:  file.OriginalName,
+		MimeType:  file.MimeType,
+		Size:      file.Size,
+		ExpiresAt: expiresAt,
+	}, nil
 }
 
 func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {
