@@ -11,7 +11,6 @@ import (
 	"qvarkk/kvault/internal/routes"
 	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/logger"
-	"qvarkk/kvault/migrations"
 	"time"
 
 	"go.uber.org/zap"
@@ -50,11 +49,6 @@ func main() {
 		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
 	}
 	defer pg.Close()
-
-	err = migrations.RunMigrations(pg.DB.DB, config.DB.Database)
-	if err != nil {
-		logger.Logger.Fatal("Failed to run migrations", zap.Error(err))
-	}
 
 	redisConfig := redis.Config{
 		Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),

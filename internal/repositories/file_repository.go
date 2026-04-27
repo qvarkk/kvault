@@ -55,7 +55,8 @@ func (r *FileRepo) List(ctx context.Context, params ListFileParams) ([]domain.Fi
 	baseQuery := r.queryBuilder.
 		Select().
 		From("files").
-		Where(sq.Eq{"user_id": params.UserID})
+		Where(sq.Eq{"user_id": params.UserID}).
+		Where(sq.Eq{"deleted_at": nil})
 
 	if params.Query != "" {
 		baseQuery = baseQuery.Where("search_vector @@ websearch_to_tsquery('simple', ?)", params.Query)
@@ -114,8 +115,8 @@ func (r *FileRepo) List(ctx context.Context, params ListFileParams) ([]domain.Fi
 
 func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, error) {
 	sql, args, err := r.queryBuilder.
-		Select("*").From("files").
-		Where(sq.Eq{"id": fileID}).ToSql()
+		Select("*").From("files").Where(sq.Eq{"id": fileID}).
+		Where(sq.Eq{"deleted_at": nil}).ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}

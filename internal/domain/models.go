@@ -38,6 +38,7 @@ type Item struct {
 	CreatedAt    time.Time      `db:"created_at"`
 	UpdatedAt    time.Time      `db:"updated_at"`
 	SearchVector string         `db:"search_vector"`
+	DeletedAt    sql.NullTime   `db:"deleted_at"`
 }
 
 type File struct {
@@ -52,6 +53,7 @@ type File struct {
 	CreatedAt    time.Time      `db:"created_at"`
 	UpdatedAt    time.Time      `db:"updated_at"`
 	SearchVector string         `db:"search_vector"`
+	DeletedAt    sql.NullTime   `db:"deleted_at"`
 }
 
 type Tag struct {

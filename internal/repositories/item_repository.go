@@ -53,9 +53,8 @@ func (r *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 
 	offset := uint64(params.PageSize * (params.Page - 1))
 	baseQuery := r.queryBuilder.
-		Select().
-		From("items").
-		Where(sq.Eq{"user_id": params.UserID})
+		Select().From("items").Where(sq.Eq{"user_id": params.UserID}).
+		Where(sq.Eq{"deleted_at": nil})
 
 	if params.Query != "" {
 		baseQuery = baseQuery.Where("search_vector @@ websearch_to_tsquery('simple', ?)", params.Query)
@@ -113,8 +112,8 @@ func (r *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.It
 
 func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
 	sql, args, err := r.queryBuilder.
-		Select("*").From("items").
-		Where(sq.Eq{"id": itemID}).ToSql()
+		Select("*").From("items").Where(sq.Eq{"id": itemID}).
+		Where(sq.Eq{"deleted_at": nil}).ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
