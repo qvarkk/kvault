@@ -26,18 +26,23 @@ run-worker:
 build-worker:
 	go build -o $(WORKER_BINARY) $(WORKER_CMD_PATH)/main.go
 
+## migrate-up: Run up all migrations
 migrate-up:
 	go run $(MIGRATE_CMD_PATH) up
 
+## migrate-down: Run down all migrations
 migrate-down:
 	go run $(MIGRATE_CMD_PATH) down
 
+## migrate-steps: Run N steps migrations (e.g. N=-1)
 migrate-steps:
 	go run $(MIGRATE_CMD_PATH) steps $(N)
 
+## migrate-force: Force a migration version (e.g. V=3)
 migrate-force:
 	go run $(MIGRATE_CMD_PATH) force $(V)
 
+## migrate-version: Show migrations information
 migrate-version:
 	go run $(MIGRATE_CMD_PATH) version
 
