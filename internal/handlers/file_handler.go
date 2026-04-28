@@ -16,6 +16,7 @@ type FileService interface {
 	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
 	List(context.Context, services.ListFileParams) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
+	DeleteByID(ctx context.Context, fileID, userID string) error
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
 	UploadPdfFileToS3(context.Context, *multipart.FileHeader) (string, error)
 	EnqueuePdfProcessTask(context.Context, tasks.PdfProcessPayload) (*asynq.TaskInfo, error)
@@ -42,7 +43,7 @@ type listFileRequest struct {
 	FileSortingParams
 }
 
-type getFileUri struct {
+type fileIDUri struct {
 	ID string `uri:"id" binding:"required,uuid"`
 }
 
@@ -165,7 +166,7 @@ func (h *FileHandler) List(ctx *gin.Context) error {
 func (h *FileHandler) Download(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
-	var uri getFileUri
+	var uri fileIDUri
 	if err := ctx.ShouldBindUri(&uri); err != nil {
 		return err
 	}
@@ -176,5 +177,35 @@ func (h *FileHandler) Download(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toAwsUrlResponse(url))
+	return nil
+}
+
+// @Summary      Soft delete a file
+// @Description  Marks a file with given ID as deleted if it's owned by the User
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "File ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/{id} [delete]
+func (h *FileHandler) Delete(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri fileIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.fileService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
 	return nil
 }

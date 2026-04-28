@@ -24,6 +24,7 @@ type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
 	List(context.Context, repositories.ListFileParams) ([]domain.File, int, error)
 	GetByID(context.Context, string) (*domain.File, error)
+	SoftDeleteByID(context.Context, string) error
 }
 
 type FileService struct {
@@ -108,6 +109,24 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 		Size:      file.Size,
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+func (s *FileService) DeleteByID(ctx context.Context, fileID, userID string) error {
+	file, err := s.fileRepo.GetByID(ctx, fileID)
+	if err != nil {
+		return NewServiceError(ErrFileNotFound, "not found", err)
+	}
+
+	if file.UserID != userID {
+		return NewServiceError(ErrFileNotFound, "forbidden", nil)
+	}
+
+	err = s.fileRepo.SoftDeleteByID(ctx, fileID)
+	if err != nil {
+		return NewServiceError(ErrInternal, "delete file internal error", err)
+	}
+
+	return nil
 }
 
 func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {

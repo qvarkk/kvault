@@ -153,8 +153,8 @@ func (h *ItemHandler) Get(ctx *gin.Context) error {
 	return nil
 }
 
-// @Summary      Delete an item from your vault
-// @Description  Deletes an item by ID if it's owned by the User
+// @Summary      Soft delete an item
+// @Description  Marks an item with given ID as deleted if it's owned by the User
 // @Tags         Items
 // @Security     ApiKeyAuth
 // @Accept       json

@@ -126,6 +126,18 @@ func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, er
 	return &file, toRepositoryError(err)
 }
 
+func (r *FileRepo) SoftDeleteByID(ctx context.Context, fileID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("files").Set("deleted_at", "now()").
+		Where(sq.Eq{"id": fileID}).ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
 // Updates status and returns updated file
 func (r *FileRepo) UpdateStatusByID(
 	ctx context.Context,

@@ -69,4 +69,5 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.
 	group.POST("/upload", handlers.APIWrap(h.UploadFile))
 	group.GET("", handlers.APIWrap(h.List))
 	group.GET("/:id", handlers.APIWrap(h.Download))
+	group.DELETE("/:id", handlers.APIWrap(h.Delete))
 }
