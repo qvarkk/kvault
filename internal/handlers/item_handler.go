@@ -13,6 +13,7 @@ type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
 	List(context.Context, services.ListItemParams) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
+	DeleteByID(ctx context.Context, itemID, userID string) error
 }
 
 type ItemHandler struct {
@@ -38,7 +39,7 @@ type listItemRequest struct {
 	ItemSortingParams
 }
 
-type getItemUri struct {
+type itemIDUri struct {
 	ID string `uri:"id" binding:"required,uuid"`
 }
 
@@ -131,7 +132,6 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 // @Param        id path string true "Item ID"
 // @Success      200   {object}  ItemResponse
 // @Failure      401   {object}  httpx.ErrorResponse
-// @Failure      403   {object}  httpx.ErrorResponse
 // @Failure      404   {object}  httpx.ErrorResponse
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
@@ -139,7 +139,7 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 func (h *ItemHandler) Get(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
-	var uri getItemUri
+	var uri itemIDUri
 	if err := ctx.ShouldBindUri(&uri); err != nil {
 		return err
 	}
@@ -150,5 +150,35 @@ func (h *ItemHandler) Get(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toItemResponse(item))
+	return nil
+}
+
+// @Summary      Delete an item from your vault
+// @Description  Deletes an item by ID if it's owned by the User
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Item ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id} [delete]
+func (h *ItemHandler) Delete(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.itemService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
 	return nil
 }

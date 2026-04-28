@@ -10,6 +10,7 @@ type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
 	List(context.Context, repositories.ListItemParams) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
+	SoftDeleteByID(context.Context, string) error
 }
 
 type ItemService struct {
@@ -66,4 +67,22 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 	}
 
 	return item, nil
+}
+
+func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
+	item, err := s.itemRepo.GetByID(ctx, itemID)
+	if err != nil {
+		return NewServiceError(ErrItemNotFound, "not found", err)
+	}
+
+	if item.UserID != userID {
+		return NewServiceError(ErrItemNotFound, "forbidden", nil)
+	}
+
+	err = s.itemRepo.SoftDeleteByID(ctx, itemID)
+	if err != nil {
+		return NewServiceError(ErrInternal, "delete item internal error", err)
+	}
+
+	return nil
 }

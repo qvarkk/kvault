@@ -122,3 +122,15 @@ func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, er
 	err = r.db.GetContext(ctx, &item, sql, args...)
 	return &item, toRepositoryError(err)
 }
+
+func (r *ItemRepo) SoftDeleteByID(ctx context.Context, itemID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("items").Set("deleted_at", "now()").
+		Where(sq.Eq{"id": itemID}).ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
