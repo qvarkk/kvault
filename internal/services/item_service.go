@@ -2,15 +2,17 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repositories"
 )
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
-	List(context.Context, repositories.ListItemParams) ([]domain.Item, int, error)
+	List(context.Context, repositories.ListItemInput) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
 	SoftDeleteByID(context.Context, string) error
+	Update(context.Context, *domain.Item) error
 }
 
 type ItemService struct {
@@ -24,7 +26,14 @@ type CreateItemInput struct {
 	Content string
 }
 
-type ListItemParams repositories.ListItemParams
+type ListItemInput repositories.ListItemInput
+
+type UpdateItemInput struct {
+	ItemID  string
+	UserID  string
+	Title   *string
+	Content *string
+}
 
 func NewItemService(itemRepo ItemRepo) *ItemService {
 	return &ItemService{
@@ -48,8 +57,8 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, params ListItemParams) ([]domain.Item, int, error) {
-	items, count, err := s.itemRepo.List(ctx, repositories.ListItemParams(params))
+func (s *ItemService) List(ctx context.Context, params ListItemInput) ([]domain.Item, int, error) {
+	items, count, err := s.itemRepo.List(ctx, repositories.ListItemInput(params))
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list items internal error", err)
 	}
@@ -85,4 +94,28 @@ func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) err
 	}
 
 	return nil
+}
+
+func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domain.Item, error) {
+	item, err := s.itemRepo.GetByID(ctx, input.ItemID)
+	if err != nil {
+		return nil, NewServiceError(ErrItemNotFound, "not found", err)
+	}
+
+	if item.UserID != input.UserID {
+		return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
+	}
+
+	if input.Title != nil {
+		item.Title = *input.Title
+	}
+	if input.Content != nil {
+		item.Content = sql.NullString{String: *input.Content, Valid: true}
+	}
+
+	if err := s.itemRepo.Update(ctx, item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
 }

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/errgroup"
 )
 
-type ListItemParams struct {
+type ListItemInput struct {
 	UserID    string
 	Query     string
 	Type      string
@@ -47,7 +48,7 @@ func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) List(ctx context.Context, params ListItemParams) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, params ListItemInput) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
@@ -127,6 +128,23 @@ func (r *ItemRepo) SoftDeleteByID(ctx context.Context, itemID string) error {
 	sql, args, err := r.queryBuilder.
 		Update("items").Set("deleted_at", "now()").
 		Where(sq.Eq{"id": itemID}).ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) Update(ctx context.Context, item *domain.Item) error {
+	sql, args, err := r.queryBuilder.
+		Update("items").
+		Set("title", item.Title).
+		Set("content", item.Content).
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"id": item.ID}).
+		Where(sq.Eq{"deleted_at": nil}).
+		ToSql()
 	if err != nil {
 		return toRepositoryError(err)
 	}

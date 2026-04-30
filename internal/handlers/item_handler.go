@@ -11,9 +11,10 @@ import (
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
-	List(context.Context, services.ListItemParams) ([]domain.Item, int, error)
+	List(context.Context, services.ListItemInput) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
+	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
 }
 
 type ItemHandler struct {
@@ -41,6 +42,11 @@ type listItemRequest struct {
 
 type itemIDUri struct {
 	ID string `uri:"id" binding:"required,uuid"`
+}
+
+type UpdateItemRequest struct {
+	Title   *string `json:"title"`
+	Content *string `json:"content"`
 }
 
 // @Summary      Create an item in your vault
@@ -99,7 +105,7 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := services.ListItemParams{
+	params := services.ListItemInput{
 		UserID:    userID,
 		Query:     req.Query,
 		Type:      req.Type,
@@ -180,5 +186,48 @@ func (h *ItemHandler) Delete(ctx *gin.Context) error {
 	}
 
 	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Update an item in your vault
+// @Description  Partially updates an item by ID
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string            true  "Item ID"
+// @Param        body body      UpdateItemRequest  true  "Fields to update"
+// @Success      200  {object}  ItemResponse
+// @Failure      401  {object}  httpx.ErrorResponse
+// @Failure      404  {object}  httpx.ErrorResponse
+// @Failure      422  {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500  {object}  httpx.ErrorResponse
+// @Router       /items/{id} [patch]
+func (h *ItemHandler) Update(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	var req UpdateItemRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return err
+	}
+
+	itemInput := services.UpdateItemInput{
+		ItemID:  uri.ID,
+		UserID:  userID,
+		Title:   req.Title,
+		Content: req.Content,
+	}
+
+	item, err := h.itemService.Update(ctx.Request.Context(), itemInput)
+	if err != nil {
+		return err
+	}
+
+	ctx.JSON(http.StatusOK, toItemResponse(item))
 	return nil
 }

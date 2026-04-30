@@ -61,6 +61,7 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.
 	group.POST("", handlers.APIWrap(h.Create))
 	group.GET("", handlers.APIWrap(h.List))
 	group.GET("/:id", handlers.APIWrap(h.Get))
+	group.PATCH("/:id", handlers.APIWrap(h.Update))
 	group.DELETE("/:id", handlers.APIWrap(h.Delete))
 }
 

@@ -10,7 +10,7 @@ type ItemResponse struct {
 	UserID    string `json:"user_id"`
 	Type      string `json:"type"`
 	Title     string `json:"title"`
-	Content   string `json:"content,omitempty"`
+	Content   string `json:"content"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
