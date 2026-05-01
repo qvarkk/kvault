@@ -68,16 +68,17 @@ func main() {
 	}
 
 	var (
-		userRepo = repositories.NewUserRepo(pg.DB)
-		itemRepo = repositories.NewItemRepo(pg.DB)
-		fileRepo = repositories.NewFileRepo(pg.DB)
+		userRepo   = repositories.NewUserRepo(pg.DB)
+		itemRepo   = repositories.NewItemRepo(pg.DB)
+		fileRepo   = repositories.NewFileRepo(pg.DB)
+		transactor = repositories.NewTransactor(pg.DB)
 	)
 
 	var (
 		authService = services.NewAuthService(userRepo)
 		userService = services.NewUserService(userRepo)
-		itemService = services.NewItemService(itemRepo)
-		fileService = services.NewFileService(fileRepo, redis, aws)
+		itemService = services.NewItemService(itemRepo, transactor)
+		fileService = services.NewFileService(fileRepo, transactor, redis, aws)
 	)
 
 	hs := &routes.HandlerServices{

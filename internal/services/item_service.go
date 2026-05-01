@@ -2,21 +2,23 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/repositories"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
-	List(context.Context, repositories.ListItemInput) ([]domain.Item, int, error)
+	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
-	SoftDeleteByID(context.Context, string) error
-	Update(context.Context, *domain.Item) error
+	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
+	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
+	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
 }
 
 type ItemService struct {
-	itemRepo ItemRepo
+	itemRepo   ItemRepo
+	transactor Transactor
 }
 
 type CreateItemInput struct {
@@ -26,8 +28,6 @@ type CreateItemInput struct {
 	Content string
 }
 
-type ListItemInput repositories.ListItemInput
-
 type UpdateItemInput struct {
 	ItemID  string
 	UserID  string
@@ -35,9 +35,10 @@ type UpdateItemInput struct {
 	Content *string
 }
 
-func NewItemService(itemRepo ItemRepo) *ItemService {
+func NewItemService(itemRepo ItemRepo, transactor Transactor) *ItemService {
 	return &ItemService{
-		itemRepo: itemRepo,
+		itemRepo:   itemRepo,
+		transactor: transactor,
 	}
 }
 
@@ -57,8 +58,8 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, params ListItemInput) ([]domain.Item, int, error) {
-	items, count, err := s.itemRepo.List(ctx, repositories.ListItemInput(params))
+func (s *ItemService) List(ctx context.Context, params domain.ListItemParams) ([]domain.Item, int, error) {
+	items, count, err := s.itemRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list items internal error", err)
 	}
@@ -79,43 +80,54 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 }
 
 func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
-	item, err := s.itemRepo.GetByID(ctx, itemID)
-	if err != nil {
-		return NewServiceError(ErrItemNotFound, "not found", err)
-	}
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, itemID)
+		if err != nil {
+			return NewServiceError(ErrItemNotFound, "not found", err)
+		}
 
-	if item.UserID != userID {
-		return NewServiceError(ErrItemNotFound, "forbidden", nil)
-	}
+		if item.UserID != userID {
+			return NewServiceError(ErrItemNotFound, "forbidden", nil)
+		}
 
-	err = s.itemRepo.SoftDeleteByID(ctx, itemID)
-	if err != nil {
-		return NewServiceError(ErrInternal, "delete item internal error", err)
-	}
+		err = s.itemRepo.SoftDeleteByIDTx(ctx, tx, itemID)
+		if err != nil {
+			return NewServiceError(ErrInternal, "delete item internal error", err)
+		}
 
-	return nil
+		return nil
+	})
+
+	return err
 }
 
 func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domain.Item, error) {
-	item, err := s.itemRepo.GetByID(ctx, input.ItemID)
-	if err != nil {
-		return nil, NewServiceError(ErrItemNotFound, "not found", err)
-	}
+	var updated *domain.Item
 
-	if item.UserID != input.UserID {
-		return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
-	}
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, input.ItemID)
+		if err != nil {
+			return NewServiceError(ErrItemNotFound, "not found", err)
+		}
 
-	if input.Title != nil {
-		item.Title = *input.Title
-	}
-	if input.Content != nil {
-		item.Content = sql.NullString{String: *input.Content, Valid: true}
-	}
+		if item.UserID != input.UserID {
+			return NewServiceError(ErrItemNotFound, "forbidden", nil)
+		}
 
-	if err := s.itemRepo.Update(ctx, item); err != nil {
-		return nil, err
-	}
+		if input.Title != nil {
+			item.Title = *input.Title
+		}
+		if input.Content != nil {
+			item.Content = NewNullString(*input.Content)
+		}
 
-	return item, nil
+		if err := s.itemRepo.UpdateTx(ctx, tx, item); err != nil {
+			return NewServiceError(ErrInternal, "update item internal error", nil)
+		}
+
+		updated = item
+		return nil
+	})
+
+	return updated, err
 }

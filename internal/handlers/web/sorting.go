@@ -1,4 +1,4 @@
-package handlers
+package web
 
 type SortingParams struct {
 	Direction string `form:"order_by,default=DESC" binding:"oneof=DESC ASC"`

@@ -10,16 +10,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type ListFileParams struct {
-	UserID    string
-	Query     string
-	MimeType  string
-	Page      int
-	PageSize  int
-	Direction string
-	Column    string
-}
-
 type FileRepo struct {
 	db           *sqlx.DB
 	queryBuilder sq.StatementBuilderType
@@ -47,7 +37,7 @@ func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 	return toRepositoryError(err)
 }
 
-func (r *FileRepo) List(ctx context.Context, params ListFileParams) ([]domain.File, int, error) {
+func (r *FileRepo) List(ctx context.Context, params domain.ListFileParams) ([]domain.File, int, error) {
 	var files []domain.File
 	var count int
 
@@ -126,7 +116,20 @@ func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, er
 	return &file, toRepositoryError(err)
 }
 
-func (r *FileRepo) SoftDeleteByID(ctx context.Context, fileID string) error {
+func (r *FileRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, fileID string) (*domain.File, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").From("files").Where(sq.Eq{"id": fileID}).
+		Where(sq.Eq{"deleted_at": nil}).Suffix("FOR UPDATE").ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var file domain.File
+	err = tx.GetContext(ctx, &file, sql, args...)
+	return &file, toRepositoryError(err)
+}
+
+func (r *FileRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string) error {
 	sql, args, err := r.queryBuilder.
 		Update("files").Set("deleted_at", "now()").
 		Where(sq.Eq{"id": fileID}).ToSql()
@@ -134,45 +137,27 @@ func (r *FileRepo) SoftDeleteByID(ctx context.Context, fileID string) error {
 		return toRepositoryError(err)
 	}
 
-	_, err = r.db.ExecContext(ctx, sql, args...)
+	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }
 
-// Updates status and returns updated file
-func (r *FileRepo) UpdateStatusByID(
+func (r *FileRepo) UpdateTx(
 	ctx context.Context,
-	fileID string,
-	status string,
-) (*domain.File, error) {
-	return r.updateFile(ctx, fileID, map[string]any{
-		"status": status,
-	})
-}
-
-// Updates text content and returns updated file
-func (r *FileRepo) UpdateTextContentByID(
-	ctx context.Context,
-	fileID string,
-	textContent string,
-) (*domain.File, error) {
-	return r.updateFile(ctx, fileID, map[string]any{
-		"text_content": textContent,
-	})
-}
-
-func (r *FileRepo) updateFile(
-	ctx context.Context,
-	fileID string,
-	values map[string]any,
-) (*domain.File, error) {
+	tx *sqlx.Tx,
+	file *domain.File,
+) error {
 	sql, args, err := r.queryBuilder.
-		Update("files").SetMap(values).Set("updated_at", "now()").
-		Where(sq.Eq{"id": fileID}).Suffix("RETURNING *").ToSql()
+		Update("files").
+		Set("text_content", file.TextContent).
+		Set("status", file.Status).
+		Set("updated_at", "now()").
+		Where(sq.Eq{"id": file.ID}).
+		Where(sq.Eq{"deleted_at": nil}).
+		ToSql()
 	if err != nil {
-		return nil, toRepositoryError(err)
+		return toRepositoryError(err)
 	}
 
-	var file domain.File
-	err = r.db.GetContext(ctx, &file, sql, args...)
-	return &file, toRepositoryError(err)
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
 }

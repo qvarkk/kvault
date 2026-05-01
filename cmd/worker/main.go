@@ -5,6 +5,7 @@ import (
 	"log"
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/aws"
+	"qvarkk/kvault/internal/handlers/worker"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/services"
@@ -57,8 +58,9 @@ func main() {
 	)
 
 	fileRepo := repositories.NewFileRepo(pg.DB)
-	fileService := services.NewFileTaskService(fileRepo, aws)
-	fileTaskHandler := tasks.NewFileTaskHandler(fileService)
+	transactor := repositories.NewTransactor(pg.DB)
+	fileService := services.NewFileTaskService(fileRepo, transactor, aws)
+	fileTaskHandler := worker.NewFileTaskHandler(fileService)
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(tasks.TypePdfProcess, fileTaskHandler.HandlePdfProcessTask)

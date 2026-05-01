@@ -1,4 +1,4 @@
-package handlers
+package web
 
 type PaginationParams struct {
 	Page     int `form:"page,default=1" binding:"min=1"`

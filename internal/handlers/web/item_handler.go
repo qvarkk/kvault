@@ -1,4 +1,4 @@
-package handlers
+package web
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
-	List(context.Context, services.ListItemInput) ([]domain.Item, int, error)
+	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
@@ -105,7 +105,7 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := services.ListItemInput{
+	params := domain.ListItemParams{
 		UserID:    userID,
 		Query:     req.Query,
 		Type:      req.Type,

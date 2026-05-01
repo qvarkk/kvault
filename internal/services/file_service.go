@@ -10,7 +10,6 @@ import (
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/redis"
-	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/tasks"
 	"time"
 
@@ -18,19 +17,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/jmoiron/sqlx"
 )
 
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
-	List(context.Context, repositories.ListFileParams) ([]domain.File, int, error)
+	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
 	GetByID(context.Context, string) (*domain.File, error)
-	SoftDeleteByID(context.Context, string) error
+	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
+	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 }
 
 type FileService struct {
-	fileRepo FileRepo
-	redis    *redis.Redis
-	aws      *aws.Aws
+	fileRepo   FileRepo
+	transactor Transactor
+	redis      *redis.Redis
+	aws        *aws.Aws
 }
 
 type CreateFileInput struct {
@@ -42,13 +44,12 @@ type CreateFileInput struct {
 	Status       string
 }
 
-type ListFileParams repositories.ListFileParams
-
-func NewFileService(fileRepo FileRepo, redis *redis.Redis, aws *aws.Aws) *FileService {
+func NewFileService(fileRepo FileRepo, transactor Transactor, redis *redis.Redis, aws *aws.Aws) *FileService {
 	return &FileService{
-		fileRepo: fileRepo,
-		redis:    redis,
-		aws:      aws,
+		fileRepo:   fileRepo,
+		transactor: transactor,
+		redis:      redis,
+		aws:        aws,
 	}
 }
 
@@ -70,8 +71,8 @@ func (s *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*do
 	return file, nil
 }
 
-func (s *FileService) List(ctx context.Context, params ListFileParams) ([]domain.File, int, error) {
-	files, count, err := s.fileRepo.List(ctx, repositories.ListFileParams(params))
+func (s *FileService) List(ctx context.Context, params domain.ListFileParams) ([]domain.File, int, error) {
+	files, count, err := s.fileRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list files internal error", err)
 	}
@@ -112,21 +113,25 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 }
 
 func (s *FileService) DeleteByID(ctx context.Context, fileID, userID string) error {
-	file, err := s.fileRepo.GetByID(ctx, fileID)
-	if err != nil {
-		return NewServiceError(ErrFileNotFound, "not found", err)
-	}
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		file, err := s.fileRepo.GetByIDForUpdate(ctx, tx, fileID)
+		if err != nil {
+			return NewServiceError(ErrFileNotFound, "not found", err)
+		}
 
-	if file.UserID != userID {
-		return NewServiceError(ErrFileNotFound, "forbidden", nil)
-	}
+		if file.UserID != userID {
+			return NewServiceError(ErrFileNotFound, "forbidden", nil)
+		}
 
-	err = s.fileRepo.SoftDeleteByID(ctx, fileID)
-	if err != nil {
-		return NewServiceError(ErrInternal, "delete file internal error", err)
-	}
+		err = s.fileRepo.SoftDeleteByIDTx(ctx, tx, fileID)
+		if err != nil {
+			return NewServiceError(ErrInternal, "delete file internal error", err)
+		}
 
-	return nil
+		return nil
+	})
+
+	return err
 }
 
 func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {

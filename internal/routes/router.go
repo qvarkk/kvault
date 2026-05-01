@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"qvarkk/kvault/internal/handlers"
+	"qvarkk/kvault/internal/handlers/web"
 	"qvarkk/kvault/internal/middleware"
 
 	_ "qvarkk/kvault/docs"
@@ -12,11 +12,11 @@ import (
 )
 
 type HandlerServices struct {
-	Auth     handlers.AuthService
-	AuthUser handlers.AuthUserService
-	User     handlers.UserService
-	Item     handlers.ItemService
-	File     handlers.FileService
+	Auth     web.AuthService
+	AuthUser web.AuthUserService
+	User     web.UserService
+	Item     web.ItemService
+	File     web.FileService
 }
 
 type MiddlewareServices struct {
@@ -32,43 +32,43 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 	api := r.Group("/api/v1")
 	auth := middleware.AuthRequired(ms.User)
 
-	registerAuthRoutes(api, auth, handlers.NewAuthHandler(hs.Auth, hs.AuthUser))
-	registerUserRoutes(api, auth, handlers.NewUserHandler(hs.User))
-	registerItemRoutes(api, auth, handlers.NewItemHandler(hs.Item))
-	registerFileRoutes(api, auth, handlers.NewFileHandler(hs.File))
+	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser))
+	registerUserRoutes(api, auth, web.NewUserHandler(hs.User))
+	registerItemRoutes(api, auth, web.NewItemHandler(hs.Item))
+	registerFileRoutes(api, auth, web.NewFileHandler(hs.File))
 
 	return r
 }
 
-func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.AuthHandler) {
+func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.AuthHandler) {
 	group := api.Group("/auth")
-	group.POST("/register", handlers.APIWrap(h.RegisterUser))
-	group.POST("/login", handlers.APIWrap(h.AuthenticateUser))
+	group.POST("/register", web.APIWrap(h.RegisterUser))
+	group.POST("/login", web.APIWrap(h.AuthenticateUser))
 
 	protected := group.Group("/", auth)
-	protected.GET("/me", handlers.APIWrap(h.GetAuthenticatedUser))
-	protected.POST("/refresh", handlers.APIWrap(h.RotateApiKey))
+	protected.GET("/me", web.APIWrap(h.GetAuthenticatedUser))
+	protected.POST("/refresh", web.APIWrap(h.RotateApiKey))
 }
 
-func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.UserHandler) {
+func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.UserHandler) {
 	group := api.Group("/users", auth)
 	// TODO: RBAC, fix the idea that /users route only gets user by email lol
-	group.GET("", handlers.APIWrap(h.GetByEmail))
+	group.GET("", web.APIWrap(h.GetByEmail))
 }
 
-func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.ItemHandler) {
+func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.ItemHandler) {
 	group := api.Group("/items", auth)
-	group.POST("", handlers.APIWrap(h.Create))
-	group.GET("", handlers.APIWrap(h.List))
-	group.GET("/:id", handlers.APIWrap(h.Get))
-	group.PATCH("/:id", handlers.APIWrap(h.Update))
-	group.DELETE("/:id", handlers.APIWrap(h.Delete))
+	group.POST("", web.APIWrap(h.Create))
+	group.GET("", web.APIWrap(h.List))
+	group.GET("/:id", web.APIWrap(h.Get))
+	group.PATCH("/:id", web.APIWrap(h.Update))
+	group.DELETE("/:id", web.APIWrap(h.Delete))
 }
 
-func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *handlers.FileHandler) {
+func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileHandler) {
 	group := api.Group("/files", auth)
-	group.POST("/upload", handlers.APIWrap(h.UploadFile))
-	group.GET("", handlers.APIWrap(h.List))
-	group.GET("/:id", handlers.APIWrap(h.Download))
-	group.DELETE("/:id", handlers.APIWrap(h.Delete))
+	group.POST("/upload", web.APIWrap(h.UploadFile))
+	group.GET("", web.APIWrap(h.List))
+	group.GET("/:id", web.APIWrap(h.Download))
+	group.DELETE("/:id", web.APIWrap(h.Delete))
 }

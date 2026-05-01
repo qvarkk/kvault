@@ -11,16 +11,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type ListItemInput struct {
-	UserID    string
-	Query     string
-	Type      string
-	Page      int
-	PageSize  int
-	Direction string
-	Column    string
-}
-
 type ItemRepo struct {
 	db           *sqlx.DB
 	queryBuilder sq.StatementBuilderType
@@ -41,14 +31,14 @@ func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 		Values(item.UserID, item.Type, item.Title, item.Content).
 		Suffix("RETURNING *").ToSql()
 	if err != nil {
-		return err
+		return toRepositoryError(err)
 	}
 
 	err = r.db.QueryRowxContext(ctx, sql, args...).StructScan(item)
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) List(ctx context.Context, params ListItemInput) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, params domain.ListItemParams) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
@@ -124,7 +114,20 @@ func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, er
 	return &item, toRepositoryError(err)
 }
 
-func (r *ItemRepo) SoftDeleteByID(ctx context.Context, itemID string) error {
+func (r *ItemRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string) (*domain.Item, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").From("items").Where(sq.Eq{"id": itemID}).
+		Where(sq.Eq{"deleted_at": nil}).Suffix("FOR UPDATE").ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var item domain.Item
+	err = tx.GetContext(ctx, &item, sql, args...)
+	return &item, toRepositoryError(err)
+}
+
+func (r *ItemRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string) error {
 	sql, args, err := r.queryBuilder.
 		Update("items").Set("deleted_at", "now()").
 		Where(sq.Eq{"id": itemID}).ToSql()
@@ -132,11 +135,11 @@ func (r *ItemRepo) SoftDeleteByID(ctx context.Context, itemID string) error {
 		return toRepositoryError(err)
 	}
 
-	_, err = r.db.ExecContext(ctx, sql, args...)
+	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) Update(ctx context.Context, item *domain.Item) error {
+func (r *ItemRepo) UpdateTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item) error {
 	sql, args, err := r.queryBuilder.
 		Update("items").
 		Set("title", item.Title).
@@ -149,6 +152,6 @@ func (r *ItemRepo) Update(ctx context.Context, item *domain.Item) error {
 		return toRepositoryError(err)
 	}
 
-	_, err = r.db.ExecContext(ctx, sql, args...)
+	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }

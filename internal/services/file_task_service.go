@@ -11,24 +11,33 @@ import (
 
 	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jmoiron/sqlx"
 	"github.com/ledongthuc/pdf"
 )
 
+type UpdateFileInput struct {
+	FileID      string
+	UserID      string
+	Status      *domain.FileStatus
+	TextContent *string
+}
+
 type FileTaskRepo interface {
-	GetByID(context.Context, string) (*domain.File, error)
-	UpdateStatusByID(ctx context.Context, fileID string, status string) (*domain.File, error)
-	UpdateTextContentByID(ctx context.Context, fileID string, textContent string) (*domain.File, error)
+	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
+	UpdateTx(context.Context, *sqlx.Tx, *domain.File) error
 }
 
 type FileTaskService struct {
-	fileRepo FileTaskRepo
-	aws      *aws.Aws
+	fileRepo   FileTaskRepo
+	transactor Transactor
+	aws        *aws.Aws
 }
 
-func NewFileTaskService(fileRepo FileTaskRepo, aws *aws.Aws) *FileTaskService {
+func NewFileTaskService(fileRepo FileTaskRepo, transactor Transactor, aws *aws.Aws) *FileTaskService {
 	return &FileTaskService{
-		fileRepo: fileRepo,
-		aws:      aws,
+		fileRepo:   fileRepo,
+		transactor: transactor,
+		aws:        aws,
 	}
 }
 
@@ -86,18 +95,36 @@ func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.
 	return normalizedText, nil
 }
 
-func (s *FileTaskService) UpdateFileStatusByID(
+func (s *FileTaskService) UpdateFile(
 	ctx context.Context,
-	fileID string,
-	status domain.FileStatus,
+	input UpdateFileInput,
 ) (*domain.File, error) {
-	return s.fileRepo.UpdateStatusByID(ctx, fileID, string(status))
-}
+	var updated *domain.File
 
-func (s *FileTaskService) UpdateFileTextContentByID(
-	ctx context.Context,
-	fileID string,
-	textContent string,
-) (*domain.File, error) {
-	return s.fileRepo.UpdateTextContentByID(ctx, fileID, textContent)
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		file, err := s.fileRepo.GetByIDForUpdate(ctx, tx, input.FileID)
+		if err != nil {
+			return NewServiceError(ErrFileNotFound, "not found", err)
+		}
+
+		if file.UserID != input.UserID {
+			return NewServiceError(ErrFileNotFound, "forbidden", err)
+		}
+
+		if input.Status != nil {
+			file.Status = *input.Status
+		}
+		if input.TextContent != nil {
+			file.TextContent = NewNullString(*input.TextContent)
+		}
+
+		if err := s.fileRepo.UpdateTx(ctx, tx, file); err != nil {
+			return NewServiceError(ErrInternal, "update file internal error", err)
+		}
+
+		updated = file
+		return nil
+	})
+
+	return updated, err
 }

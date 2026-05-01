@@ -1,4 +1,4 @@
-package handlers
+package web
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 type FileService interface {
 	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
-	List(context.Context, services.ListFileParams) ([]domain.File, int, error)
+	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
@@ -126,7 +126,7 @@ func (h *FileHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := services.ListFileParams{
+	params := domain.ListFileParams{
 		UserID:    userID,
 		Query:     req.Query,
 		MimeType:  req.MimeType,
