@@ -11,7 +11,8 @@ type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
 	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
-	GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deleted bool) (*domain.Item, error)
+	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
+	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
@@ -84,7 +85,7 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 	var updated *domain.Item
 
 	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, input.ItemID, false)
+		item, err := s.itemRepo.GetActiveByIDForUpdate(ctx, tx, input.ItemID)
 		if err != nil {
 			return NewServiceError(ErrItemNotFound, "not found", err)
 		}
@@ -112,19 +113,28 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 }
 
 func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
-	return s.performTxActionByID(ctx, itemID, userID, false, s.itemRepo.SoftDeleteByIDTx)
+	return s.authorizeAndMutateTx(
+		ctx, itemID, userID,
+		s.itemRepo.GetActiveByIDForUpdate,
+		s.itemRepo.SoftDeleteByIDTx,
+	)
 }
 
 func (s *ItemService) RestoreByID(ctx context.Context, itemID, userID string) error {
-	return s.performTxActionByID(ctx, itemID, userID, true, s.itemRepo.RestoreByIDTx)
+	return s.authorizeAndMutateTx(
+		ctx, itemID, userID,
+		s.itemRepo.GetDeletedByIDForUpdate,
+		s.itemRepo.RestoreByIDTx,
+	)
 }
 
-func (s *ItemService) performTxActionByID(
-	ctx context.Context, itemID, userID string, deleted bool,
-	fn func(context.Context, *sqlx.Tx, string) error,
+func (s *ItemService) authorizeAndMutateTx(
+	ctx context.Context, itemID, userID string,
+	getFn func(context.Context, *sqlx.Tx, string) (*domain.Item, error),
+	mutateFn func(context.Context, *sqlx.Tx, string) error,
 ) error {
 	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, itemID, deleted)
+		item, err := getFn(ctx, tx, itemID)
 		if err != nil {
 			return NewServiceError(ErrItemNotFound, "not found", err)
 		}
@@ -133,9 +143,9 @@ func (s *ItemService) performTxActionByID(
 			return NewServiceError(ErrItemNotFound, "forbidden", nil)
 		}
 
-		err = fn(ctx, tx, itemID)
+		err = mutateFn(ctx, tx, itemID)
 		if err != nil {
-			return NewServiceError(ErrInternal, "delete item internal error", err)
+			return NewServiceError(ErrInternal, "mutate item internal error", err)
 		}
 
 		return nil

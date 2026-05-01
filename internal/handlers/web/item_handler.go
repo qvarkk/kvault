@@ -217,20 +217,7 @@ func (h *ItemHandler) Update(ctx *gin.Context) error {
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{id} [delete]
 func (h *ItemHandler) Delete(ctx *gin.Context) error {
-	userID := ctx.MustGet("userID").(string)
-
-	var uri itemIDUri
-	if err := ctx.ShouldBindUri(&uri); err != nil {
-		return err
-	}
-
-	err := h.itemService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
-	if err != nil {
-		return err
-	}
-
-	ctx.Status(http.StatusNoContent)
-	return nil
+	return h.withOwnedItemAction(ctx, h.itemService.DeleteByID)
 }
 
 // @Summary      Restore a soft deleted item
@@ -247,6 +234,13 @@ func (h *ItemHandler) Delete(ctx *gin.Context) error {
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{id}/restore [post]
 func (h *ItemHandler) Restore(ctx *gin.Context) error {
+	return h.withOwnedItemAction(ctx, h.itemService.RestoreByID)
+}
+
+func (h *ItemHandler) withOwnedItemAction(
+	ctx *gin.Context,
+	fn func(context.Context, string, string) error,
+) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var uri itemIDUri
@@ -254,7 +248,7 @@ func (h *ItemHandler) Restore(ctx *gin.Context) error {
 		return err
 	}
 
-	err := h.itemService.RestoreByID(ctx.Request.Context(), uri.ID, userID)
+	err := fn(ctx.Request.Context(), uri.ID, userID)
 	if err != nil {
 		return err
 	}

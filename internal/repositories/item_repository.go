@@ -117,20 +117,22 @@ func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, er
 	return &item, toRepositoryError(err)
 }
 
-func (r *ItemRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deleted bool) (*domain.Item, error) {
-	query := r.queryBuilder.
+func (r *ItemRepo) GetActiveByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string) (*domain.Item, error) {
+	return r.getByIDForUpdate(ctx, tx, itemID, sq.Eq{"deleted_at": nil})
+}
+
+func (r *ItemRepo) GetDeletedByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string) (*domain.Item, error) {
+	return r.getByIDForUpdate(ctx, tx, itemID, sq.NotEq{"deleted_at": nil})
+}
+
+func (r *ItemRepo) getByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deletedCondition sq.Sqlizer) (*domain.Item, error) {
+	sql, args, err := r.queryBuilder.
 		Select("*").
 		From("items").
 		Where(sq.Eq{"id": itemID}).
-		Suffix("FOR UPDATE")
-
-	if !deleted {
-		query = query.Where(sq.Eq{"deleted_at": nil})
-	} else {
-		query = query.Where(sq.NotEq{"deleted_at": nil})
-	}
-
-	sql, args, err := query.ToSql()
+		Where(deletedCondition).
+		Suffix("FOR UPDATE").
+		ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
