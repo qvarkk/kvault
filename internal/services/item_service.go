@@ -11,9 +11,10 @@ type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
 	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
-	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
-	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
+	GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deleted bool) (*domain.Item, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
+	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
+	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 }
 
 type ItemService struct {
@@ -79,33 +80,11 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 	return item, nil
 }
 
-func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
-	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, itemID)
-		if err != nil {
-			return NewServiceError(ErrItemNotFound, "not found", err)
-		}
-
-		if item.UserID != userID {
-			return NewServiceError(ErrItemNotFound, "forbidden", nil)
-		}
-
-		err = s.itemRepo.SoftDeleteByIDTx(ctx, tx, itemID)
-		if err != nil {
-			return NewServiceError(ErrInternal, "delete item internal error", err)
-		}
-
-		return nil
-	})
-
-	return err
-}
-
 func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domain.Item, error) {
 	var updated *domain.Item
 
 	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, input.ItemID)
+		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, input.ItemID, false)
 		if err != nil {
 			return NewServiceError(ErrItemNotFound, "not found", err)
 		}
@@ -130,4 +109,37 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 	})
 
 	return updated, err
+}
+
+func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
+	return s.performTxActionByID(ctx, itemID, userID, false, s.itemRepo.SoftDeleteByIDTx)
+}
+
+func (s *ItemService) RestoreByID(ctx context.Context, itemID, userID string) error {
+	return s.performTxActionByID(ctx, itemID, userID, true, s.itemRepo.RestoreByIDTx)
+}
+
+func (s *ItemService) performTxActionByID(
+	ctx context.Context, itemID, userID string, deleted bool,
+	fn func(context.Context, *sqlx.Tx, string) error,
+) error {
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		item, err := s.itemRepo.GetByIDForUpdate(ctx, tx, itemID, deleted)
+		if err != nil {
+			return NewServiceError(ErrItemNotFound, "not found", err)
+		}
+
+		if item.UserID != userID {
+			return NewServiceError(ErrItemNotFound, "forbidden", nil)
+		}
+
+		err = fn(ctx, tx, itemID)
+		if err != nil {
+			return NewServiceError(ErrInternal, "delete item internal error", err)
+		}
+
+		return nil
+	})
+
+	return err
 }

@@ -103,8 +103,11 @@ func (r *ItemRepo) List(ctx context.Context, params domain.ListItemParams) ([]do
 
 func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, error) {
 	sql, args, err := r.queryBuilder.
-		Select("*").From("items").Where(sq.Eq{"id": itemID}).
-		Where(sq.Eq{"deleted_at": nil}).ToSql()
+		Select("*").
+		From("items").
+		Where(sq.Eq{"id": itemID}).
+		Where(sq.Eq{"deleted_at": nil}).
+		ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
@@ -114,10 +117,20 @@ func (r *ItemRepo) GetByID(ctx context.Context, itemID string) (*domain.Item, er
 	return &item, toRepositoryError(err)
 }
 
-func (r *ItemRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string) (*domain.Item, error) {
-	sql, args, err := r.queryBuilder.
-		Select("*").From("items").Where(sq.Eq{"id": itemID}).
-		Where(sq.Eq{"deleted_at": nil}).Suffix("FOR UPDATE").ToSql()
+func (r *ItemRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deleted bool) (*domain.Item, error) {
+	query := r.queryBuilder.
+		Select("*").
+		From("items").
+		Where(sq.Eq{"id": itemID}).
+		Suffix("FOR UPDATE")
+
+	if !deleted {
+		query = query.Where(sq.Eq{"deleted_at": nil})
+	} else {
+		query = query.Where(sq.NotEq{"deleted_at": nil})
+	}
+
+	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
@@ -125,18 +138,6 @@ func (r *ItemRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID str
 	var item domain.Item
 	err = tx.GetContext(ctx, &item, sql, args...)
 	return &item, toRepositoryError(err)
-}
-
-func (r *ItemRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string) error {
-	sql, args, err := r.queryBuilder.
-		Update("items").Set("deleted_at", "now()").
-		Where(sq.Eq{"id": itemID}).ToSql()
-	if err != nil {
-		return toRepositoryError(err)
-	}
-
-	_, err = tx.ExecContext(ctx, sql, args...)
-	return toRepositoryError(err)
 }
 
 func (r *ItemRepo) UpdateTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item) error {
@@ -147,6 +148,34 @@ func (r *ItemRepo) UpdateTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item)
 		Set("updated_at", time.Now()).
 		Where(sq.Eq{"id": item.ID}).
 		Where(sq.Eq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("items").
+		Set("deleted_at", "now()").
+		Where(sq.Eq{"id": itemID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("items").
+		Set("deleted_at", nil).
+		Where(sq.Eq{"id": itemID}).
 		ToSql()
 	if err != nil {
 		return toRepositoryError(err)

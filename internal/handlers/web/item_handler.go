@@ -15,6 +15,7 @@ type ItemService interface {
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
+	RestoreByID(ctx context.Context, itemID, userID string) error
 }
 
 type ItemHandler struct {
@@ -159,36 +160,6 @@ func (h *ItemHandler) Get(ctx *gin.Context) error {
 	return nil
 }
 
-// @Summary      Soft delete an item
-// @Description  Marks an item with given ID as deleted if it's owned by the User
-// @Tags         Items
-// @Security     ApiKeyAuth
-// @Accept       json
-// @Produce      json
-// @Param        id path string true "Item ID"
-// @Success      204
-// @Failure      401   {object}  httpx.ErrorResponse
-// @Failure      404   {object}  httpx.ErrorResponse
-// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
-// @Failure      500   {object}  httpx.ErrorResponse
-// @Router       /items/{id} [delete]
-func (h *ItemHandler) Delete(ctx *gin.Context) error {
-	userID := ctx.MustGet("userID").(string)
-
-	var uri itemIDUri
-	if err := ctx.ShouldBindUri(&uri); err != nil {
-		return err
-	}
-
-	err := h.itemService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
-	if err != nil {
-		return err
-	}
-
-	ctx.Status(http.StatusNoContent)
-	return nil
-}
-
 // @Summary      Update an item in your vault
 // @Description  Partially updates an item by ID
 // @Tags         Items
@@ -229,5 +200,65 @@ func (h *ItemHandler) Update(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toItemResponse(item))
+	return nil
+}
+
+// @Summary      Soft delete an item
+// @Description  Marks an item with given ID as deleted if it's owned by the User
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Item ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id} [delete]
+func (h *ItemHandler) Delete(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.itemService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Restore a soft deleted item
+// @Description  Unmarks an item with given ID as deleted if it's owned by the User
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Item ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id}/restore [post]
+func (h *ItemHandler) Restore(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.itemService.RestoreByID(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
 	return nil
 }

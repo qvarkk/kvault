@@ -63,6 +63,7 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.ItemH
 	group.GET("/:id", web.APIWrap(h.Get))
 	group.PATCH("/:id", web.APIWrap(h.Update))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
+	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }
 
 func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileHandler) {
