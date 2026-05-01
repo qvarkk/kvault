@@ -5,8 +5,12 @@ import (
 	"time"
 )
 
-type FileStatus string
-type ItemType string
+type (
+	FileStatus     string
+	ItemType       string
+	TagSource      string
+	StopwordSource string
+)
 
 const (
 	FileStatusUploading  FileStatus = "uploading"
@@ -18,6 +22,16 @@ const (
 const (
 	ItemTypeText ItemType = "text"
 	ItemTypeUrl  ItemType = "url"
+)
+
+const (
+	TagSourceAuto   TagSource = "auto"
+	TagSourceManual TagSource = "manual"
+)
+
+const (
+	StopwordSourceDefault StopwordSource = "default"
+	StopwordSourceUser    StopwordSource = "user"
 )
 
 type User struct {
@@ -60,8 +74,18 @@ type Tag struct {
 	ID        string    `db:"id"`
 	Name      string    `db:"name"`
 	UserID    string    `db:"user_id"`
+	Source    TagSource `db:"source"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type Stopword struct {
+	Word      string         `db:"word"`
+	UserID    string         `db:"source"`
+	Source    StopwordSource `db:"source"`
+	IsEnabled bool           `db:"is_enabled"`
+	CreatedAt time.Time      `db:"created_at"`
+	UpdatedAt time.Time      `db:"updated_at"`
 }
 
 type ItemTag struct {
