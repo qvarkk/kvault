@@ -81,7 +81,7 @@ type Tag struct {
 
 type Stopword struct {
 	Word      string         `db:"word"`
-	UserID    string         `db:"source"`
+	UserID    string         `db:"user_id"`
 	Source    StopwordSource `db:"source"`
 	IsEnabled bool           `db:"is_enabled"`
 	CreatedAt time.Time      `db:"created_at"`

@@ -68,17 +68,19 @@ func main() {
 	}
 
 	var (
-		userRepo   = repositories.NewUserRepo(pg.DB)
-		itemRepo   = repositories.NewItemRepo(pg.DB)
-		fileRepo   = repositories.NewFileRepo(pg.DB)
-		transactor = repositories.NewTransactor(pg.DB)
+		userRepo     = repositories.NewUserRepo(pg.DB)
+		itemRepo     = repositories.NewItemRepo(pg.DB)
+		fileRepo     = repositories.NewFileRepo(pg.DB)
+		stopwordRepo = repositories.NewStopwordRepo(pg.DB)
+		transactor   = repositories.NewTransactor(pg.DB)
 	)
 
 	var (
-		authService = services.NewAuthService(userRepo)
-		userService = services.NewUserService(userRepo)
-		itemService = services.NewItemService(itemRepo, transactor)
-		fileService = services.NewFileService(fileRepo, transactor, redis, aws)
+		authService     = services.NewAuthService(userRepo)
+		userService     = services.NewUserService(userRepo)
+		itemService     = services.NewItemService(itemRepo, transactor)
+		fileService     = services.NewFileService(fileRepo, transactor, redis, aws)
+		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
 	)
 
 	hs := &routes.HandlerServices{
@@ -87,6 +89,7 @@ func main() {
 		User:     userService,
 		Item:     itemService,
 		File:     fileService,
+		Stopword: stopwordService,
 	}
 
 	ms := &routes.MiddlewareServices{

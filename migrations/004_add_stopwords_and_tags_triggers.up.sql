@@ -75,19 +75,25 @@ ON CONFLICT DO NOTHING;
 
 
 CREATE OR REPLACE FUNCTION active_stopwords(p_user_id UUID)
-RETURNS TABLE(word TEXT) AS $$
-  SELECT sd.word
+RETURNS TABLE(word TEXT, source stopword_source, is_enabled BOOL, updated_at TIMESTAMPTZ) AS $$
+  SELECT 
+    sd.word,
+    'default'::stopword_source AS source,
+    CASE WHEN s.word IS NOT NULL THEN s.is_enabled ELSE true END AS is_enabled,
+    COALESCE(s.updated_at, '0001-01-01 00:00:00+00'::TIMESTAMPTZ) AS updated_at
   FROM stopwords_default sd
   LEFT JOIN stopwords s ON s.word = sd.word AND s.user_id = p_user_id
-  WHERE CASE WHEN s.word IS NOT NULL THEN s.is_enabled ELSE true END = true
 
   UNION ALL
 
-  SELECT s.word
+  SELECT
+    s.word,
+    'user'::stopword_source AS source,
+    s.is_enabled,
+    s.updated_at
   FROM stopwords s
   WHERE s.user_id = p_user_id
-    AND s.word NOT IN (SELECT word FROM stopwords_default)
-    AND s.is_enabled = true;
+    AND s.word NOT IN (SELECT word FROM stopwords_default);
 $$ LANGUAGE sql STABLE;
 
 
@@ -103,13 +109,16 @@ BEGIN
 
   FOR tag_word IN
     EXECUTE format(
-      'SELECT word FROM ts_stat($1) WHERE length(word) > 3
-      AND word ~ $2
-      ORDER BY nentry DESC LIMIT 3'
+      'SELECT word FROM ts_stat(%L) 
+        WHERE length(word) > 3
+          AND word ~ %L
+          AND word NOT IN (SELECT word FROM active_stopwords(%L::uuid))
+        ORDER BY nentry DESC
+        LIMIT 3',
+      'SELECT search_vector FROM items WHERE id = ''' || item_id || '''',
+      '^[a-zA-Zа-яА-ЯёЁ\u00C0-\u024F]+$',
+      item_user_id
     )
-    USING 
-      'SELECT search_vector FROM items WHERE id = ' || quote_literal(item_id),
-      '^[a-zA-Zа-яА-ЯёЁ\u00C0-\u024F]+$'
   LOOP
     INSERT INTO tags (user_id, name)
     VALUES (item_user_id, tag_word)

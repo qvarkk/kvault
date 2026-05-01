@@ -1,7 +1,7 @@
 DROP TRIGGER IF EXISTS auto_tag_item_update ON ITEMS;
 DROP FUNCTION IF EXISTS trigger_auto_tag_item();
-DROP FUNCTION IF EXISTS extract_item_tags();
-DROP FUNCTION IF EXISTS active_stopwords();
+DROP FUNCTION IF EXISTS extract_item_tags(UUID, UUID, TEXT, TSVECTOR);
+DROP FUNCTION IF EXISTS active_stopwords(UUID);
 
 DROP TABLE IF EXISTS stopwords_default;
 
