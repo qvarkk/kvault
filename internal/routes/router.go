@@ -72,4 +72,5 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileH
 	group.GET("", web.APIWrap(h.List))
 	group.GET("/:id", web.APIWrap(h.Download))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
+	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }

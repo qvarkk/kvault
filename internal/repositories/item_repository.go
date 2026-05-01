@@ -125,7 +125,12 @@ func (r *ItemRepo) GetDeletedByIDForUpdate(ctx context.Context, tx *sqlx.Tx, ite
 	return r.getByIDForUpdate(ctx, tx, itemID, sq.NotEq{"deleted_at": nil})
 }
 
-func (r *ItemRepo) getByIDForUpdate(ctx context.Context, tx *sqlx.Tx, itemID string, deletedCondition sq.Sqlizer) (*domain.Item, error) {
+func (r *ItemRepo) getByIDForUpdate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	itemID string,
+	deletedCondition sq.Sqlizer,
+) (*domain.Item, error) {
 	sql, args, err := r.queryBuilder.
 		Select("*").
 		From("items").

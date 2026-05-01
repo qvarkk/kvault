@@ -24,8 +24,10 @@ type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
 	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
 	GetByID(context.Context, string) (*domain.File, error)
-	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
+	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
+	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
+	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 }
 
 type FileService struct {
@@ -113,8 +115,28 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 }
 
 func (s *FileService) DeleteByID(ctx context.Context, fileID, userID string) error {
+	return s.authorizeAndMutateTx(
+		ctx, fileID, userID,
+		s.fileRepo.GetActiveByIDForUpdate,
+		s.fileRepo.SoftDeleteByIDTx,
+	)
+}
+
+func (s *FileService) RestoreByID(ctx context.Context, fileID, userID string) error {
+	return s.authorizeAndMutateTx(
+		ctx, fileID, userID,
+		s.fileRepo.GetDeletedByIDForUpdate,
+		s.fileRepo.RestoreByIDTx,
+	)
+}
+
+func (s *FileService) authorizeAndMutateTx(
+	ctx context.Context, fileID, userID string,
+	getFn func(context.Context, *sqlx.Tx, string) (*domain.File, error),
+	mutateFn func(context.Context, *sqlx.Tx, string) error,
+) error {
 	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		file, err := s.fileRepo.GetByIDForUpdate(ctx, tx, fileID)
+		file, err := getFn(ctx, tx, fileID)
 		if err != nil {
 			return NewServiceError(ErrFileNotFound, "not found", err)
 		}
@@ -123,9 +145,9 @@ func (s *FileService) DeleteByID(ctx context.Context, fileID, userID string) err
 			return NewServiceError(ErrFileNotFound, "forbidden", nil)
 		}
 
-		err = s.fileRepo.SoftDeleteByIDTx(ctx, tx, fileID)
+		err = mutateFn(ctx, tx, fileID)
 		if err != nil {
-			return NewServiceError(ErrInternal, "delete file internal error", err)
+			return NewServiceError(ErrInternal, "mutate file internal error", err)
 		}
 
 		return nil

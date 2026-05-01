@@ -23,7 +23,7 @@ type UpdateFileInput struct {
 }
 
 type FileTaskRepo interface {
-	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
+	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.File) error
 }
 
@@ -102,7 +102,7 @@ func (s *FileTaskService) UpdateFile(
 	var updated *domain.File
 
 	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
-		file, err := s.fileRepo.GetByIDForUpdate(ctx, tx, input.FileID)
+		file, err := s.fileRepo.GetActiveByIDForUpdate(ctx, tx, input.FileID)
 		if err != nil {
 			return NewServiceError(ErrFileNotFound, "not found", err)
 		}

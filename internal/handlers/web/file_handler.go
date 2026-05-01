@@ -17,6 +17,7 @@ type FileService interface {
 	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
+	RestoreByID(ctx context.Context, fileID, userID string) error
 	ValidatePdfFile(context.Context, *multipart.FileHeader) error
 	UploadPdfFileToS3(context.Context, *multipart.FileHeader) (string, error)
 	EnqueuePdfProcessTask(context.Context, tasks.PdfProcessPayload) (*asynq.TaskInfo, error)
@@ -194,14 +195,38 @@ func (h *FileHandler) Download(ctx *gin.Context) error {
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /files/{id} [delete]
 func (h *FileHandler) Delete(ctx *gin.Context) error {
+	return h.withOwnedFileAction(ctx, h.fileService.DeleteByID)
+}
+
+// @Summary      Restore a soft deleted file
+// @Description  Unmarks a file with given ID as deleted if it's owned by the User
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "File ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/{id}/restore [post]
+func (h *FileHandler) Restore(ctx *gin.Context) error {
+	return h.withOwnedFileAction(ctx, h.fileService.RestoreByID)
+}
+
+func (h *FileHandler) withOwnedFileAction(
+	ctx *gin.Context,
+	fn func(context.Context, string, string) error,
+) error {
 	userID := ctx.MustGet("userID").(string)
 
-	var uri fileIDUri
+	var uri itemIDUri
 	if err := ctx.ShouldBindUri(&uri); err != nil {
 		return err
 	}
 
-	err := h.fileService.DeleteByID(ctx.Request.Context(), uri.ID, userID)
+	err := fn(ctx.Request.Context(), uri.ID, userID)
 	if err != nil {
 		return err
 	}

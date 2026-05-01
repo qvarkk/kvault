@@ -116,10 +116,35 @@ func (r *FileRepo) GetByID(ctx context.Context, fileID string) (*domain.File, er
 	return &file, toRepositoryError(err)
 }
 
-func (r *FileRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, fileID string) (*domain.File, error) {
+func (r *FileRepo) GetActiveByIDForUpdate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	fileID string,
+) (*domain.File, error) {
+	return r.getByIDForUpdate(ctx, tx, fileID, sq.Eq{"deleted_at": nil})
+}
+
+func (r *FileRepo) GetDeletedByIDForUpdate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	fileID string,
+) (*domain.File, error) {
+	return r.getByIDForUpdate(ctx, tx, fileID, sq.NotEq{"deleted_at": nil})
+}
+
+func (r *FileRepo) getByIDForUpdate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	fileID string,
+	deleteCondition sq.Sqlizer,
+) (*domain.File, error) {
 	sql, args, err := r.queryBuilder.
-		Select("*").From("files").Where(sq.Eq{"id": fileID}).
-		Where(sq.Eq{"deleted_at": nil}).Suffix("FOR UPDATE").ToSql()
+		Select("*").
+		From("files").
+		Where(sq.Eq{"id": fileID}).
+		Where(deleteCondition).
+		Suffix("FOR UPDATE").
+		ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
@@ -127,18 +152,6 @@ func (r *FileRepo) GetByIDForUpdate(ctx context.Context, tx *sqlx.Tx, fileID str
 	var file domain.File
 	err = tx.GetContext(ctx, &file, sql, args...)
 	return &file, toRepositoryError(err)
-}
-
-func (r *FileRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string) error {
-	sql, args, err := r.queryBuilder.
-		Update("files").Set("deleted_at", "now()").
-		Where(sq.Eq{"id": fileID}).ToSql()
-	if err != nil {
-		return toRepositoryError(err)
-	}
-
-	_, err = tx.ExecContext(ctx, sql, args...)
-	return toRepositoryError(err)
 }
 
 func (r *FileRepo) UpdateTx(
@@ -153,6 +166,34 @@ func (r *FileRepo) UpdateTx(
 		Set("updated_at", "now()").
 		Where(sq.Eq{"id": file.ID}).
 		Where(sq.Eq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *FileRepo) SoftDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("files").
+		Set("deleted_at", "now()").
+		Where(sq.Eq{"id": fileID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *FileRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string) error {
+	sql, args, err := r.queryBuilder.
+		Update("files").
+		Set("deleted_at", nil).
+		Where(sq.Eq{"id": fileID}).
 		ToSql()
 	if err != nil {
 		return toRepositoryError(err)
