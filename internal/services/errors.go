@@ -20,6 +20,7 @@ var (
 	ErrStopwordAlreadyExists = errors.New("service: stopword already exists")
 	ErrStopwordNotFound      = errors.New("service: stopword was not found")
 	ErrTagNotCreated         = errors.New("service: failed to create tag")
+	ErrTagNotFound           = errors.New("service: tag was not found")
 	ErrTagAlreadyExists      = errors.New("service: tag already exists")
 	ErrPdfFileFormat         = errors.New("services: provided file has to be a PDF file")
 )

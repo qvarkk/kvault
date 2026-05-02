@@ -12,6 +12,7 @@ import (
 type TagService interface {
 	CreateNew(context.Context, services.CreateTagInput) (*domain.Tag, error)
 	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
+	Update(context.Context, services.UpdateTagInput) (*domain.Tag, error)
 }
 
 type TagHandler struct {
@@ -30,6 +31,14 @@ type listTagRequest struct {
 	Query string `form:"q"`
 	PaginationParams
 	TagSortingParams
+}
+
+type updateTagRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type tagIdUri struct {
+	ID string `uri:"id" binding:"required,uuid"`
 }
 
 // @Summary      Create a tag in your vault
@@ -112,5 +121,47 @@ func (h *TagHandler) List(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(tagResponses, count, req.Page, req.PageSize))
+	return nil
+}
+
+// @Summary      Update a tag name in your vault
+// @Description  Updates tag name by ID
+// @Tags         Tags
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string            true  "Tag ID"
+// @Param        body body      updateTagRequest  true  "Fields to update"
+// @Success      200  {object}  TagResponse
+// @Failure      401  {object}  httpx.ErrorResponse
+// @Failure      404  {object}  httpx.ErrorResponse
+// @Failure      422  {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500  {object}  httpx.ErrorResponse
+// @Router       /tags/{id} [patch]
+func (h *TagHandler) Update(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	var req updateTagRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return err
+	}
+
+	tagInput := services.UpdateTagInput{
+		TagID:  uri.ID,
+		UserID: userID,
+		Name:   req.Name,
+	}
+
+	tag, err := h.tagService.Update(ctx.Request.Context(), tagInput)
+	if err != nil {
+		return err
+	}
+
+	ctx.JSON(http.StatusOK, toTagResponse(tag))
 	return nil
 }

@@ -75,6 +75,13 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
+		target: services.ErrTagNotFound,
+		public: &PublicError{
+			Err:     ErrNotFound,
+			Message: "This tag does not exist.",
+		},
+	},
+	{
 		target: services.ErrTagAlreadyExists,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,

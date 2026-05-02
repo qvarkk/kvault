@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -96,4 +97,39 @@ func (r *TagRepo) List(
 	}
 
 	return tags, count, nil
+}
+
+func (r *TagRepo) GetByIDForUpdate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	tagID string,
+) (*domain.Tag, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").
+		From("tags").
+		Where(sq.Eq{"id": tagID}).
+		Suffix("FOR UPDATE").
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var tag domain.Tag
+	err = tx.GetContext(ctx, &tag, sql, args...)
+	return &tag, toRepositoryError(err)
+}
+
+func (r *TagRepo) UpdateTx(ctx context.Context, tx *sqlx.Tx, tag *domain.Tag) error {
+	sql, args, err := r.queryBuilder.
+		Update("tags").
+		Set("name", tag.Name).
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"id": tag.ID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
 }

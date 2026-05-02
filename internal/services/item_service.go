@@ -102,7 +102,7 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 		}
 
 		if err := s.itemRepo.UpdateTx(ctx, tx, item); err != nil {
-			return NewServiceError(ErrInternal, "update item internal error", nil)
+			return NewServiceError(ErrInternal, "update item internal error", err)
 		}
 
 		updated = item
