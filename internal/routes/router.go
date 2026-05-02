@@ -42,7 +42,7 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 	return r
 }
 
-func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.AuthHandler) {
+func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandler) {
 	group := api.Group("/auth")
 	group.POST("/register", web.APIWrap(h.RegisterUser))
 	group.POST("/login", web.APIWrap(h.AuthenticateUser))
@@ -52,13 +52,13 @@ func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.AuthH
 	protected.POST("/refresh", web.APIWrap(h.RotateApiKey))
 }
 
-func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.UserHandler) {
+func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h UserHandler) {
 	group := api.Group("/users", auth)
 	// TODO: RBAC, fix the idea that /users route only gets user by email lol
 	group.GET("", web.APIWrap(h.GetByEmail))
 }
 
-func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.ItemHandler) {
+func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandler) {
 	group := api.Group("/items", auth)
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
@@ -68,7 +68,7 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.ItemH
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }
 
-func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileHandler) {
+func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandler) {
 	group := api.Group("/files", auth)
 	group.POST("/upload", web.APIWrap(h.UploadFile))
 	group.GET("", web.APIWrap(h.List))
@@ -77,7 +77,7 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileH
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }
 
-func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.StopwordHandler) {
+func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h StopwordHandler) {
 	group := api.Group("/stopwords", auth)
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
