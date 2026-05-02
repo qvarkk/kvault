@@ -82,7 +82,7 @@ func main() {
 		itemService     = services.NewItemService(itemRepo, transactor)
 		fileService     = services.NewFileService(fileRepo, transactor, redis, aws)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
-		tagService      = services.NewTagService(tagRepo, transactor)
+		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
 	)
 
 	hs := &routes.HandlerServices{

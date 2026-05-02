@@ -19,14 +19,16 @@ type TagRepo interface {
 }
 
 type TagService struct {
-	tagRepo    TagRepo
-	transactor Transactor
+	tagRepo      TagRepo
+	stopwordRepo StopwordRepo
+	transactor   Transactor
 }
 
-func NewTagService(tagRepo TagRepo, transactor Transactor) *TagService {
+func NewTagService(tagRepo TagRepo, stopwordRepo StopwordRepo, transactor Transactor) *TagService {
 	return &TagService{
-		tagRepo:    tagRepo,
-		transactor: transactor,
+		tagRepo:      tagRepo,
+		stopwordRepo: stopwordRepo,
+		transactor:   transactor,
 	}
 }
 
@@ -104,6 +106,7 @@ func (s *TagService) Update(
 func (s *TagService) DeleteByID(
 	ctx context.Context,
 	tagID, userID string,
+	block bool,
 ) error {
 	tag, err := s.tagRepo.GetByID(ctx, tagID)
 	if err != nil {
@@ -117,6 +120,22 @@ func (s *TagService) DeleteByID(
 	err = s.tagRepo.DeleteByID(ctx, tagID)
 	if err != nil {
 		return NewServiceError(ErrInternal, "delete tag internal error", err)
+	}
+
+	if block {
+		stopword := &domain.Stopword{
+			Word:      tag.Name,
+			UserID:    userID,
+			Source:    domain.StopwordSourceUser,
+			IsEnabled: true,
+		}
+
+		err = s.stopwordRepo.CreateNew(ctx, stopword)
+		if err != nil {
+			if !errors.Is(err, repositories.ErrAlreadyExists) {
+				return NewServiceError(ErrStopwordNotCreated, "database error", err)
+			}
+		}
 	}
 
 	return nil

@@ -13,7 +13,7 @@ type TagService interface {
 	CreateNew(context.Context, services.CreateTagInput) (*domain.Tag, error)
 	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
 	Update(context.Context, services.UpdateTagInput) (*domain.Tag, error)
-	DeleteByID(ctx context.Context, tagID, userID string) error
+	DeleteByID(ctx context.Context, tagID, userID string, block bool) error
 }
 
 type TagHandler struct {
@@ -36,6 +36,10 @@ type listTagRequest struct {
 
 type updateTagRequest struct {
 	Name string `json:"name" binding:"required"`
+}
+
+type deleteTagQuery struct {
+	Block bool `form:"block"`
 }
 
 type tagIdUri struct {
@@ -173,6 +177,7 @@ func (h *TagHandler) Update(ctx *gin.Context) error {
 // @Security     ApiKeyAuth
 // @Accept       json
 // @Produce      json
+// @Param				 params query deleteTagQuery false "Query parameters"
 // @Param        id path string true "Tag ID"
 // @Success      204
 // @Failure      401   {object}  httpx.ErrorResponse
@@ -188,7 +193,12 @@ func (h *TagHandler) Delete(ctx *gin.Context) error {
 		return err
 	}
 
-	err := h.tagService.DeleteByID(ctx, uri.ID, userID)
+	var query deleteTagQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		return err
+	}
+
+	err := h.tagService.DeleteByID(ctx, uri.ID, userID, query.Block)
 	if err != nil {
 		return err
 	}
