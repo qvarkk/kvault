@@ -61,6 +61,20 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
+		target: services.ErrStopwordNotFound,
+		public: &PublicError{
+			Err:     ErrNotFound,
+			Message: "This stopword does not exist.",
+		},
+	},
+	{
+		target: services.ErrStopwordAlreadyExists,
+		public: &PublicError{
+			Err:     ErrUnprocessableEntity,
+			Message: "This stopword already exists.",
+		},
+	},
+	{
 		target: services.ErrPdfFileFormat,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,

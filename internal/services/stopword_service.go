@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/internal/repositories"
 )
 
 type StopwordRepo interface {
@@ -37,6 +39,9 @@ func (s *StopwordService) CreateNew(ctx context.Context, input CreateStopwordInp
 
 	err := s.stopwordRepo.CreateNew(ctx, stopword)
 	if err != nil {
+		if errors.Is(err, repositories.ErrAlreadyExists) {
+			return nil, NewServiceError(ErrStopwordAlreadyExists, "stopword already exists", err)
+		}
 		return nil, NewServiceError(ErrStopwordNotCreated, "database error", err)
 	}
 
