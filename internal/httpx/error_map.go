@@ -75,6 +75,13 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
+		target: services.ErrTagAlreadyExists,
+		public: &PublicError{
+			Err:     ErrUnprocessableEntity,
+			Message: "This tag already exists.",
+		},
+	},
+	{
 		target: services.ErrPdfFileFormat,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,

@@ -24,7 +24,25 @@ func NewTagRepo(db *sqlx.DB) *TagRepo {
 	}
 }
 
-func (r *TagRepo) List(ctx context.Context, params domain.ListTagFilter) ([]domain.Tag, int, error) {
+func (r *TagRepo) CreateNew(ctx context.Context, tag *domain.Tag) error {
+	sql, args, err := r.queryBuilder.
+		Insert("tags").
+		Columns("user_id", "name").
+		Values(tag.UserID, tag.Name).
+		Suffix("RETURNING *").
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	err = r.db.QueryRowxContext(ctx, sql, args...).StructScan(tag)
+	return toRepositoryError(err)
+}
+
+func (r *TagRepo) List(
+	ctx context.Context,
+	params domain.ListTagFilter,
+) ([]domain.Tag, int, error) {
 	offset := uint64(params.PageSize * (params.Page - 1))
 	baseQuery := r.queryBuilder.
 		Select().

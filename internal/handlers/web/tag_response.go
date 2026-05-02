@@ -6,7 +6,7 @@ import (
 )
 
 type TagResponse struct {
-	Name      string `json:"word"`
+	Name      string `json:"name"`
 	UserID    string `json:"user_id"`
 	UpdatedAt string `json:"updated_at"`
 	CreatedAt string `json:"created_at"`
