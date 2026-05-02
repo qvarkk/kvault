@@ -18,6 +18,7 @@ type HandlerServices struct {
 	Item     web.ItemService
 	File     web.FileService
 	Stopword web.StopwordService
+	Tag      web.TagService
 }
 
 type MiddlewareServices struct {
@@ -38,6 +39,7 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 	registerItemRoutes(api, auth, web.NewItemHandler(hs.Item))
 	registerFileRoutes(api, auth, web.NewFileHandler(hs.File))
 	registerStopwordRoutes(api, auth, web.NewStopwordHandler(hs.Stopword))
+	registerTagRoutes(api, auth, web.NewTagHandler(hs.Tag))
 
 	return r
 }
@@ -84,4 +86,9 @@ func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h Stopwo
 	group.POST("/:word/enable", web.APIWrap(h.Enable))
 	group.POST("/:word/disable", web.APIWrap(h.Disable))
 	group.DELETE("/:word", web.APIWrap(h.Delete))
+}
+
+func registerTagRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h TagHandler) {
+	group := api.Group("/tags", auth)
+	group.GET("", web.APIWrap(h.List))
 }

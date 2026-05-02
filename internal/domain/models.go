@@ -74,7 +74,6 @@ type Tag struct {
 	ID        string    `db:"id"`
 	Name      string    `db:"name"`
 	UserID    string    `db:"user_id"`
-	Source    TagSource `db:"source"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
 }
@@ -89,6 +88,7 @@ type Stopword struct {
 }
 
 type ItemTag struct {
-	ItemID string `db:"item_id"`
-	TagID  string `db:"tag_id"`
+	ItemID string    `db:"item_id"`
+	TagID  string    `db:"tag_id"`
+	Source TagSource `db:"source"`
 }

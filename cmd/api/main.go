@@ -72,6 +72,7 @@ func main() {
 		itemRepo     = repositories.NewItemRepo(pg.DB)
 		fileRepo     = repositories.NewFileRepo(pg.DB)
 		stopwordRepo = repositories.NewStopwordRepo(pg.DB)
+		tagRepo      = repositories.NewTagRepo(pg.DB)
 		transactor   = repositories.NewTransactor(pg.DB)
 	)
 
@@ -81,6 +82,7 @@ func main() {
 		itemService     = services.NewItemService(itemRepo, transactor)
 		fileService     = services.NewFileService(fileRepo, transactor, redis, aws)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
+		tagService      = services.NewTagService(tagRepo, transactor)
 	)
 
 	hs := &routes.HandlerServices{
@@ -90,6 +92,7 @@ func main() {
 		Item:     itemService,
 		File:     fileService,
 		Stopword: stopwordService,
+		Tag:      tagService,
 	}
 
 	ms := &routes.MiddlewareServices{

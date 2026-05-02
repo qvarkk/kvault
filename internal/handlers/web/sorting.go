@@ -22,3 +22,8 @@ type StopwordSortingParams struct {
 	AscendingSortingParams
 	Column string `form:"sort_by,default=source" binding:"oneof=word source updated_at"`
 }
+
+type TagSortingParams struct {
+	DescendingSortingParams
+	Column string `form:"sort_by,default=updated_at" binding:"oneof=name updated_at created_at"`
+}

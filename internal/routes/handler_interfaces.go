@@ -37,3 +37,7 @@ type StopwordHandler interface {
 	Disable(*gin.Context) error
 	Delete(*gin.Context) error
 }
+
+type TagHandler interface {
+	List(ctx *gin.Context) error
+}
