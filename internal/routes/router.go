@@ -79,5 +79,6 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.FileH
 
 func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.StopwordHandler) {
 	group := api.Group("/stopwords", auth)
+	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
 }

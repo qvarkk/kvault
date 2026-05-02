@@ -6,6 +6,7 @@ import (
 )
 
 type StopwordRepo interface {
+	CreateNew(context.Context, *domain.Stopword) error
 	List(context.Context, domain.ListStopwordParams) ([]domain.Stopword, error)
 }
 
@@ -14,11 +15,32 @@ type StopwordService struct {
 	transactor   Transactor
 }
 
+type CreateStopwordInput struct {
+	UserID string
+	Word   string
+}
+
 func NewStopwordService(stopwordRepo StopwordRepo, transactor Transactor) *StopwordService {
 	return &StopwordService{
 		stopwordRepo: stopwordRepo,
 		transactor:   transactor,
 	}
+}
+
+func (s *StopwordService) CreateNew(ctx context.Context, input CreateStopwordInput) (*domain.Stopword, error) {
+	stopword := &domain.Stopword{
+		UserID:    input.UserID,
+		Word:      input.Word,
+		Source:    domain.StopwordSourceUser,
+		IsEnabled: true,
+	}
+
+	err := s.stopwordRepo.CreateNew(ctx, stopword)
+	if err != nil {
+		return nil, NewServiceError(ErrStopwordNotCreated, "database error", err)
+	}
+
+	return stopword, nil
 }
 
 func (s *StopwordService) List(ctx context.Context, params domain.ListStopwordParams) ([]domain.Stopword, error) {

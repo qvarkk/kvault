@@ -23,6 +23,21 @@ func NewStopwordRepo(db *sqlx.DB) *StopwordRepo {
 	}
 }
 
+func (r *StopwordRepo) CreateNew(ctx context.Context, stopword *domain.Stopword) error {
+	sql, args, err := r.queryBuilder.
+		Insert("stopwords").
+		Columns("user_id", "word", "source", "is_enabled").
+		Values(stopword.UserID, stopword.Word, stopword.Source, stopword.IsEnabled).
+		Suffix("RETURNING *").
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	err = r.db.QueryRowxContext(ctx, sql, args...).StructScan(stopword)
+	return toRepositoryError(err)
+}
+
 func (r *StopwordRepo) List(
 	ctx context.Context,
 	params domain.ListStopwordParams,
