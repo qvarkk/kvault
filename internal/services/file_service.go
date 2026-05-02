@@ -22,7 +22,7 @@ import (
 
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
-	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
+	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
 	GetByID(context.Context, string) (*domain.File, error)
 	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
@@ -73,7 +73,7 @@ func (s *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*do
 	return file, nil
 }
 
-func (s *FileService) List(ctx context.Context, params domain.ListFileParams) ([]domain.File, int, error) {
+func (s *FileService) List(ctx context.Context, params domain.ListFileFilter) ([]domain.File, int, error) {
 	files, count, err := s.fileRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list files internal error", err)

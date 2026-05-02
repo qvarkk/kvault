@@ -59,7 +59,7 @@ func (r *StopwordRepo) UpsertTx(
 
 func (r *StopwordRepo) GetActiveStopwords(
 	ctx context.Context,
-	params domain.ListStopwordParams,
+	params domain.ListStopwordFilter,
 ) ([]domain.Stopword, error) {
 	// TODO: orderby injection
 	query := r.queryBuilder.

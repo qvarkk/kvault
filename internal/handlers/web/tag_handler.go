@@ -9,7 +9,7 @@ import (
 )
 
 type TagService interface {
-	List(context.Context, domain.ListTagParams) ([]domain.Tag, int, error)
+	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
 }
 
 type TagHandler struct {
@@ -46,13 +46,19 @@ func (h *TagHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := domain.ListTagParams{
-		UserID:    userID,
-		Query:     req.Query,
-		Page:      req.Page,
-		PageSize:  req.PageSize,
-		Direction: req.Direction,
-		Column:    req.Column,
+	params := domain.ListTagFilter{
+		UserID: userID,
+		QueryFilter: domain.QueryFilter{
+			Query: req.Query,
+		},
+		PaginationFilter: domain.PaginationFilter{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: req.Direction,
+			Column:    req.Column,
+		},
 	}
 
 	tags, count, err := h.tagService.List(ctx, params)

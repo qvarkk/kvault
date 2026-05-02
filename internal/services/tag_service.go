@@ -6,7 +6,7 @@ import (
 )
 
 type TagRepo interface {
-	List(context.Context, domain.ListTagParams) ([]domain.Tag, int, error)
+	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
 }
 
 type TagService struct {
@@ -21,7 +21,7 @@ func NewTagService(tagRepo TagRepo, transactor Transactor) *TagService {
 	}
 }
 
-func (s *TagService) List(ctx context.Context, params domain.ListTagParams) ([]domain.Tag, int, error) {
+func (s *TagService) List(ctx context.Context, params domain.ListTagFilter) ([]domain.Tag, int, error) {
 	tags, count, err := s.tagRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list tags", err)

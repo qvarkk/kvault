@@ -11,7 +11,7 @@ import (
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
-	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
+	List(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
@@ -106,14 +106,20 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := domain.ListItemParams{
-		UserID:    userID,
-		Query:     req.Query,
-		Type:      req.Type,
-		Page:      req.Page,
-		PageSize:  req.PageSize,
-		Direction: req.Direction,
-		Column:    req.Column,
+	params := domain.ListItemFilter{
+		UserID: userID,
+		Type:   req.Type,
+		QueryFilter: domain.QueryFilter{
+			Query: req.Query,
+		},
+		PaginationFilter: domain.PaginationFilter{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: req.Direction,
+			Column:    req.Column,
+		},
 	}
 
 	items, total, err := h.itemService.List(ctx, params)

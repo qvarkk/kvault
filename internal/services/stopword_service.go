@@ -12,7 +12,7 @@ import (
 type StopwordRepo interface {
 	CreateNew(context.Context, *domain.Stopword) error
 	UpsertTx(context.Context, *sqlx.Tx, *domain.Stopword) error
-	GetActiveStopwords(context.Context, domain.ListStopwordParams) ([]domain.Stopword, error)
+	GetActiveStopwords(context.Context, domain.ListStopwordFilter) ([]domain.Stopword, error)
 	GetForUpdate(ctx context.Context, tx *sqlx.Tx, word, userID string) (*domain.Stopword, error)
 	Get(ctx context.Context, word, userID string) (*domain.Stopword, error)
 	EnableTx(ctx context.Context, tx *sqlx.Tx, word, userID string) error
@@ -58,7 +58,7 @@ func (s *StopwordService) CreateNew(ctx context.Context, input CreateStopwordInp
 	return stopword, nil
 }
 
-func (s *StopwordService) List(ctx context.Context, params domain.ListStopwordParams) ([]domain.Stopword, error) {
+func (s *StopwordService) List(ctx context.Context, params domain.ListStopwordFilter) ([]domain.Stopword, error) {
 	stopwords, err := s.stopwordRepo.GetActiveStopwords(ctx, params)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "list stopwords internal error", err)

@@ -38,7 +38,7 @@ func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) List(ctx context.Context, params domain.ListItemParams) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, params domain.ListItemFilter) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 

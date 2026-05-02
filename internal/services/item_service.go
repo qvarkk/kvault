@@ -9,7 +9,7 @@ import (
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
-	List(context.Context, domain.ListItemParams) ([]domain.Item, int, error)
+	List(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
 	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
@@ -60,7 +60,7 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, params domain.ListItemParams) ([]domain.Item, int, error) {
+func (s *ItemService) List(ctx context.Context, params domain.ListItemFilter) ([]domain.Item, int, error) {
 	items, count, err := s.itemRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list items internal error", err)

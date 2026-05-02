@@ -11,7 +11,7 @@ import (
 
 type StopwordService interface {
 	CreateNew(context.Context, services.CreateStopwordInput) (*domain.Stopword, error)
-	List(context.Context, domain.ListStopwordParams) ([]domain.Stopword, error)
+	List(context.Context, domain.ListStopwordFilter) ([]domain.Stopword, error)
 	Enable(ctx context.Context, word, userID string) error
 	Disable(ctx context.Context, word, userID string) error
 	Delete(ctx context.Context, word, userID string) error
@@ -93,12 +93,16 @@ func (h *StopwordHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := domain.ListStopwordParams{
-		UserID:    userID,
-		Query:     req.Query,
-		Source:    req.Source,
-		Direction: req.Direction,
-		Column:    req.Column,
+	params := domain.ListStopwordFilter{
+		UserID: userID,
+		Source: req.Source,
+		QueryFilter: domain.QueryFilter{
+			Query: req.Query,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: req.Direction,
+			Column:    req.Column,
+		},
 	}
 
 	stopwords, err := h.stopwordService.List(ctx, params)

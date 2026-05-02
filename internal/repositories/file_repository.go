@@ -37,7 +37,7 @@ func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 	return toRepositoryError(err)
 }
 
-func (r *FileRepo) List(ctx context.Context, params domain.ListFileParams) ([]domain.File, int, error) {
+func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]domain.File, int, error) {
 	var files []domain.File
 	var count int
 

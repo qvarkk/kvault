@@ -14,7 +14,7 @@ import (
 
 type FileService interface {
 	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
-	List(context.Context, domain.ListFileParams) ([]domain.File, int, error)
+	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
 	RestoreByID(ctx context.Context, fileID, userID string) error
@@ -127,14 +127,20 @@ func (h *FileHandler) List(ctx *gin.Context) error {
 		return err
 	}
 
-	params := domain.ListFileParams{
-		UserID:    userID,
-		Query:     req.Query,
-		MimeType:  req.MimeType,
-		Page:      req.Page,
-		PageSize:  req.PageSize,
-		Direction: req.Direction,
-		Column:    req.Column,
+	params := domain.ListFileFilter{
+		UserID:   userID,
+		MimeType: req.MimeType,
+		QueryFilter: domain.QueryFilter{
+			Query: req.Query,
+		},
+		PaginationFilter: domain.PaginationFilter{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: req.Direction,
+			Column:    req.Column,
+		},
 	}
 
 	files, total, err := h.fileService.List(ctx, params)

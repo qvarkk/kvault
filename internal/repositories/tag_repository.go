@@ -24,7 +24,7 @@ func NewTagRepo(db *sqlx.DB) *TagRepo {
 	}
 }
 
-func (r *TagRepo) List(ctx context.Context, params domain.ListTagParams) ([]domain.Tag, int, error) {
+func (r *TagRepo) List(ctx context.Context, params domain.ListTagFilter) ([]domain.Tag, int, error) {
 	offset := uint64(params.PageSize * (params.Page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
