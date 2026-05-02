@@ -14,6 +14,7 @@ type StopwordService interface {
 	List(context.Context, domain.ListStopwordParams) ([]domain.Stopword, error)
 	Enable(ctx context.Context, word, userID string) error
 	Disable(ctx context.Context, word, userID string) error
+	Delete(ctx context.Context, word, userID string) error
 }
 
 type StopwordHandler struct {
@@ -114,7 +115,7 @@ func (h *StopwordHandler) List(ctx *gin.Context) error {
 	return nil
 }
 
-// @Summary      Enabled a stopword from user profile
+// @Summary      Enabled a stopword
 // @Description  Set IsEnabled field of the stopword to true
 // @Tags         Stopwords
 // @Security     ApiKeyAuth
@@ -131,7 +132,7 @@ func (h *StopwordHandler) Enable(ctx *gin.Context) error {
 	return h.withOwnedItemAction(ctx, h.stopwordService.Enable)
 }
 
-// @Summary      Disables a stopword from user profile
+// @Summary      Disable a stopword
 // @Description  Set IsEnabled field of the stopword to false
 // @Tags         Stopwords
 // @Security     ApiKeyAuth
@@ -146,6 +147,23 @@ func (h *StopwordHandler) Enable(ctx *gin.Context) error {
 // @Router       /stopwords/{word}/disable [post]
 func (h *StopwordHandler) Disable(ctx *gin.Context) error {
 	return h.withOwnedItemAction(ctx, h.stopwordService.Disable)
+}
+
+// @Summary      Delete a stopword
+// @Description  Deletes a stopword from user profile
+// @Tags         Stopwords
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        word path string true "Word"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /stopwords/{word} [delete]
+func (h *StopwordHandler) Delete(ctx *gin.Context) error {
+	return h.withOwnedItemAction(ctx, h.stopwordService.Delete)
 }
 
 func (h *StopwordHandler) withOwnedItemAction(

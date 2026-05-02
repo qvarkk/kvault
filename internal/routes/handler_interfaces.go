@@ -35,4 +35,5 @@ type StopwordHandler interface {
 	List(*gin.Context) error
 	Enable(*gin.Context) error
 	Disable(*gin.Context) error
+	Delete(*gin.Context) error
 }

@@ -13,8 +13,10 @@ type StopwordRepo interface {
 	CreateNew(context.Context, *domain.Stopword) error
 	List(context.Context, domain.ListStopwordParams) ([]domain.Stopword, error)
 	GetForUpdate(ctx context.Context, tx *sqlx.Tx, word, userID string) (*domain.Stopword, error)
+	Get(ctx context.Context, word, userID string) (*domain.Stopword, error)
 	EnableTx(context.Context, *sqlx.Tx, *domain.Stopword) error
 	DisableTx(context.Context, *sqlx.Tx, *domain.Stopword) error
+	Delete(context.Context, *domain.Stopword) error
 }
 
 type StopwordService struct {
@@ -88,4 +90,21 @@ func (s *StopwordService) authorizeAndMutateTx(
 	})
 
 	return err
+}
+
+func (s *StopwordService) Delete(
+	ctx context.Context,
+	word, userID string,
+) error {
+	stopword, err := s.stopwordRepo.Get(ctx, word, userID)
+	if err != nil {
+		return NewServiceError(ErrStopwordNotFound, "not found", err)
+	}
+
+	err = s.stopwordRepo.Delete(ctx, stopword)
+	if err != nil {
+		return NewServiceError(ErrInternal, "delete stopword internal error", err)
+	}
+
+	return nil
 }
