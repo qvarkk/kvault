@@ -38,7 +38,26 @@ func (r *StopwordRepo) CreateNew(ctx context.Context, stopword *domain.Stopword)
 	return toRepositoryError(err)
 }
 
-func (r *StopwordRepo) List(
+func (r *StopwordRepo) UpsertTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	stopword *domain.Stopword,
+) error {
+	query, args, err := r.queryBuilder.
+		Insert("stopwords").
+		Columns("user_id", "word", "source", "is_enabled").
+		Values(stopword.UserID, stopword.Word, stopword.Source, stopword.IsEnabled).
+		Suffix("ON CONFLICT (user_id, word) DO UPDATE SET is_enabled = EXCLUDED.is_enabled, updated_at = now()").
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, query, args...)
+	return toRepositoryError(err)
+}
+
+func (r *StopwordRepo) GetActiveStopwords(
 	ctx context.Context,
 	params domain.ListStopwordParams,
 ) ([]domain.Stopword, error) {
@@ -109,27 +128,26 @@ func (r *StopwordRepo) Get(
 	return &stopword, toRepositoryError(err)
 }
 
-func (r *StopwordRepo) EnableTx(ctx context.Context, tx *sqlx.Tx, stopword *domain.Stopword) error {
-	stopword.IsEnabled = true
-	return r.updateIsEnabledTx(ctx, tx, stopword)
+func (r *StopwordRepo) EnableTx(ctx context.Context, tx *sqlx.Tx, word, userID string) error {
+	return r.updateIsEnabledTx(ctx, tx, word, userID, true)
 }
 
-func (r *StopwordRepo) DisableTx(ctx context.Context, tx *sqlx.Tx, stopword *domain.Stopword) error {
-	stopword.IsEnabled = false
-	return r.updateIsEnabledTx(ctx, tx, stopword)
+func (r *StopwordRepo) DisableTx(ctx context.Context, tx *sqlx.Tx, word, userID string) error {
+	return r.updateIsEnabledTx(ctx, tx, word, userID, false)
 }
 
 func (r *StopwordRepo) updateIsEnabledTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
-	stopword *domain.Stopword,
+	word, userID string,
+	isEnabled bool,
 ) error {
 	sql, args, err := r.queryBuilder.
 		Update("stopwords").
-		Set("is_enabled", stopword.IsEnabled).
+		Set("is_enabled", isEnabled).
 		Set("updated_at", "now()").
-		Where(sq.Eq{"word": stopword.Word}).
-		Where(sq.Eq{"user_id": stopword.UserID}).
+		Where(sq.Eq{"word": word}).
+		Where(sq.Eq{"user_id": userID}).
 		ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -141,12 +159,12 @@ func (r *StopwordRepo) updateIsEnabledTx(
 
 func (r *StopwordRepo) Delete(
 	ctx context.Context,
-	stopword *domain.Stopword,
+	word, userID string,
 ) error {
 	sql, args, err := r.queryBuilder.
 		Delete("stopwords").
-		Where(sq.Eq{"word": stopword.Word}).
-		Where(sq.Eq{"user_id": stopword.UserID}).
+		Where(sq.Eq{"word": word}).
+		Where(sq.Eq{"user_id": userID}).
 		ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -154,4 +172,37 @@ func (r *StopwordRepo) Delete(
 
 	_, err = r.db.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
+}
+
+func (r *StopwordRepo) DeleteTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	word, userID string,
+) error {
+	sql, args, err := r.queryBuilder.
+		Delete("stopwords").
+		Where(sq.Eq{"word": word}).
+		Where(sq.Eq{"user_id": userID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *StopwordRepo) IsDefaultTx(ctx context.Context, tx *sqlx.Tx, word string) (bool, error) {
+	query, args, err := r.queryBuilder.
+		Select("COUNT(*)").
+		From("stopwords_default").
+		Where(sq.Eq{"word": word}).
+		ToSql()
+	if err != nil {
+		return false, toRepositoryError(err)
+	}
+
+	var count int
+	err = tx.GetContext(ctx, &count, query, args...)
+	return count > 0, toRepositoryError(err)
 }
