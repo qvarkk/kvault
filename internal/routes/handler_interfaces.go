@@ -42,4 +42,5 @@ type TagHandler interface {
 	Create(*gin.Context) error
 	List(*gin.Context) error
 	Update(*gin.Context) error
+	Delete(*gin.Context) error
 }

@@ -99,6 +99,21 @@ func (r *TagRepo) List(
 	return tags, count, nil
 }
 
+func (r *TagRepo) GetByID(ctx context.Context, tagID string) (*domain.Tag, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").
+		From("tags").
+		Where(sq.Eq{"id": tagID}).
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var tag domain.Tag
+	err = r.db.GetContext(ctx, &tag, sql, args...)
+	return &tag, toRepositoryError(err)
+}
+
 func (r *TagRepo) GetByIDForUpdate(
 	ctx context.Context,
 	tx *sqlx.Tx,
@@ -131,5 +146,18 @@ func (r *TagRepo) UpdateTx(ctx context.Context, tx *sqlx.Tx, tag *domain.Tag) er
 	}
 
 	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *TagRepo) DeleteByID(ctx context.Context, tagID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("tags").
+		Where(sq.Eq{"id": tagID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }

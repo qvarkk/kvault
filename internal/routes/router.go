@@ -93,4 +93,5 @@ func registerTagRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h TagHandler)
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
 	group.PATCH("/:id", web.APIWrap(h.Update))
+	group.DELETE("/:id", web.APIWrap(h.Delete))
 }

@@ -13,6 +13,7 @@ type TagService interface {
 	CreateNew(context.Context, services.CreateTagInput) (*domain.Tag, error)
 	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
 	Update(context.Context, services.UpdateTagInput) (*domain.Tag, error)
+	DeleteByID(ctx context.Context, tagID, userID string) error
 }
 
 type TagHandler struct {
@@ -163,5 +164,35 @@ func (h *TagHandler) Update(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toTagResponse(tag))
+	return nil
+}
+
+// @Summary      Delete a tag
+// @Description  Deletes a tag from user's vault
+// @Tags         Tags
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Tag ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /tags/{id} [delete]
+func (h *TagHandler) Delete(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri tagIdUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.tagService.DeleteByID(ctx, uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
 	return nil
 }

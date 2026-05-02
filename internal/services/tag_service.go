@@ -12,8 +12,10 @@ import (
 type TagRepo interface {
 	CreateNew(context.Context, *domain.Tag) error
 	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
+	GetByID(context.Context, string) (*domain.Tag, error)
 	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Tag, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Tag) error
+	DeleteByID(context.Context, string) error
 }
 
 type TagService struct {
@@ -97,4 +99,25 @@ func (s *TagService) Update(
 	})
 
 	return updated, err
+}
+
+func (s *TagService) DeleteByID(
+	ctx context.Context,
+	tagID, userID string,
+) error {
+	tag, err := s.tagRepo.GetByID(ctx, tagID)
+	if err != nil {
+		return NewServiceError(ErrTagNotFound, "not found", err)
+	}
+
+	if tag.UserID != userID {
+		return NewServiceError(ErrTagNotFound, "forbidden", nil)
+	}
+
+	err = s.tagRepo.DeleteByID(ctx, tagID)
+	if err != nil {
+		return NewServiceError(ErrInternal, "delete tag internal error", err)
+	}
+
+	return nil
 }
