@@ -81,4 +81,6 @@ func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h *web.S
 	group := api.Group("/stopwords", auth)
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
+	group.POST("/:word/enable", web.APIWrap(h.Enable))
+	group.POST("/:word/disable", web.APIWrap(h.Disable))
 }
