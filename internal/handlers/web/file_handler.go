@@ -114,7 +114,7 @@ func (h *FileHandler) UploadFile(ctx *gin.Context) error {
 // @Accept       json
 // @Produce      json
 // @Param				 params query listFileRequest false "Query parameters"
-// @Success      200   {object}  FileResponse
+// @Success      200   {object}  PaginatedResponse[FileResponse]
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse

@@ -93,7 +93,7 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 // @Accept       json
 // @Produce      json
 // @Param				 params query listItemRequest false "Query parameters"
-// @Success      200   {object}  ItemResponse
+// @Success      200   {object}  PaginatedResponse[ItemResponse]
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
