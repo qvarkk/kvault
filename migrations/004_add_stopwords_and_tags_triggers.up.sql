@@ -143,6 +143,6 @@ $$ LANGUAGE plpgsql;
 
 
 CREATE TRIGGER auto_tag_item_update
-  AFTER INSERT OR UPDATE OF title, content ON items
+  AFTER INSERT ON items
   FOR EACH ROW
   EXECUTE FUNCTION trigger_auto_tag_item();
