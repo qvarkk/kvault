@@ -16,10 +16,13 @@ type ItemRepo interface {
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
+	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
+	UnbindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 }
 
 type ItemService struct {
 	itemRepo   ItemRepo
+	tagRepo    TagRepo
 	transactor Transactor
 }
 
@@ -37,9 +40,10 @@ type UpdateItemInput struct {
 	Content *string
 }
 
-func NewItemService(itemRepo ItemRepo, transactor Transactor) *ItemService {
+func NewItemService(itemRepo ItemRepo, tagRepo TagRepo, transactor Transactor) *ItemService {
 	return &ItemService{
 		itemRepo:   itemRepo,
+		tagRepo:    tagRepo,
 		transactor: transactor,
 	}
 }
@@ -152,4 +156,52 @@ func (s *ItemService) authorizeAndMutateTx(
 	})
 
 	return err
+}
+
+func (s *ItemService) BindTagByItemID(
+	ctx context.Context,
+	itemID, tagID, userID string,
+) error {
+	return s.authorizeAndBindTagTx(ctx, itemID, tagID, userID, s.itemRepo.BindTagByItemIDTx)
+}
+
+func (s *ItemService) UnbindTagByItemID(
+	ctx context.Context,
+	itemID, tagID, userID string,
+) error {
+	return s.authorizeAndBindTagTx(ctx, itemID, tagID, userID, s.itemRepo.UnbindTagByItemIDTx)
+}
+
+func (s *ItemService) authorizeAndBindTagTx(
+	ctx context.Context,
+	itemID, tagID, userID string,
+	bindFn func(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error,
+) error {
+	return s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		item, err := s.itemRepo.GetActiveByIDForUpdate(ctx, tx, itemID)
+		if err != nil {
+			return NewServiceError(ErrItemNotFound, "not found", err)
+		}
+
+		tag, err := s.tagRepo.GetByIDForUpdate(ctx, tx, tagID)
+		if err != nil {
+			return NewServiceError(ErrTagNotFound, "not found", err)
+		}
+
+		if item.UserID != tag.UserID || item.UserID != userID {
+			return NewServiceError(ErrItemNotFound, "forbidden", nil)
+		}
+
+		err = bindFn(ctx, tx, itemID, tagID)
+		if err != nil {
+			return NewServiceError(ErrItemTagBind, "database error", err)
+		}
+
+		err = s.itemRepo.UpdateTx(ctx, tx, item)
+		if err != nil {
+			return NewServiceError(ErrItemNotUpdated, "database error", err)
+		}
+
+		return nil
+	})
 }

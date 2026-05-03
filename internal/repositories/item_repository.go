@@ -191,3 +191,39 @@ func (r *ItemRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string
 	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }
+
+func (r *ItemRepo) BindTagByItemIDTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	itemID, tagID string,
+) error {
+	sql, args, err := r.queryBuilder.
+		Insert("item_tags").
+		Columns("item_id", "tag_id", "source").
+		Values(itemID, tagID, domain.TagSourceManual).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) UnbindTagByItemIDTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	itemID, tagID string,
+) error {
+	sql, args, err := r.queryBuilder.
+		Delete("item_tags").
+		Where(sq.Eq{"item_id": itemID}).
+		Where(sq.Eq{"tag_id": tagID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}

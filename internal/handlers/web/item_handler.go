@@ -16,6 +16,8 @@ type ItemService interface {
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
 	RestoreByID(ctx context.Context, itemID, userID string) error
+	BindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
+	UnbindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
 }
 
 type ItemHandler struct {
@@ -34,7 +36,7 @@ type createItemRequest struct {
 	Content string `json:"content" example:"Some content blah blah."`
 }
 
-type listItemRequest struct {
+type listItemQuery struct {
 	Query string `form:"q"`
 	Type  string `form:"type" binding:"omitempty,oneof=text url"`
 	PaginationParams
@@ -45,9 +47,18 @@ type itemIDUri struct {
 	ID string `uri:"id" binding:"required,uuid"`
 }
 
-type UpdateItemRequest struct {
+type updateItemRequest struct {
 	Title   *string `json:"title"`
 	Content *string `json:"content"`
+}
+
+type bindTagRequest struct {
+	TagID string `json:"tag_id" binding:"required,uuid"`
+}
+
+type unbindTagUri struct {
+	ItemID string `uri:"id" binding:"required,uuid"`
+	TagID  string `uri:"tag_id" binding:"required,uuid"`
 }
 
 // @Summary      Create an item in your vault
@@ -92,7 +103,7 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 // @Security     ApiKeyAuth
 // @Accept       json
 // @Produce      json
-// @Param				 params query listItemRequest false "Query parameters"
+// @Param				 params query listItemQuery false "Query parameters"
 // @Success      200   {object}  PaginatedResponse[ItemResponse]
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
@@ -101,24 +112,24 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 func (h *ItemHandler) List(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
-	var req listItemRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	var query listItemQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
 		return err
 	}
 
 	params := domain.ListItemFilter{
 		UserID: userID,
-		Type:   req.Type,
+		Type:   query.Type,
 		QueryFilter: domain.QueryFilter{
-			Query: req.Query,
+			Query: query.Query,
 		},
 		PaginationFilter: domain.PaginationFilter{
-			Page:     req.Page,
-			PageSize: req.PageSize,
+			Page:     query.Page,
+			PageSize: query.PageSize,
 		},
 		SortFilter: domain.SortFilter{
-			Direction: req.Direction,
-			Column:    req.Column,
+			Direction: query.Direction,
+			Column:    query.Column,
 		},
 	}
 
@@ -173,7 +184,7 @@ func (h *ItemHandler) Get(ctx *gin.Context) error {
 // @Accept       json
 // @Produce      json
 // @Param        id   path      string            true  "Item ID"
-// @Param        body body      UpdateItemRequest  true  "Fields to update"
+// @Param        body body      updateItemRequest true  "Fields to update"
 // @Success      200  {object}  ItemResponse
 // @Failure      401  {object}  httpx.ErrorResponse
 // @Failure      404  {object}  httpx.ErrorResponse
@@ -188,7 +199,7 @@ func (h *ItemHandler) Update(ctx *gin.Context) error {
 		return err
 	}
 
-	var req UpdateItemRequest
+	var req updateItemRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		return err
 	}
@@ -255,6 +266,73 @@ func (h *ItemHandler) withOwnedItemAction(
 	}
 
 	err := fn(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Bind a tag to the item
+// @Description  Creates a binding between given item and tag
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id     path   string          true  "Item ID"
+// @Param        body   body   bindTagRequest  true  "Tag info"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id}/tags [post]
+func (h *ItemHandler) BindTag(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	var req bindTagRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		return err
+	}
+
+	err := h.itemService.BindTagByItemID(ctx.Request.Context(), uri.ID, req.TagID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Unbind the tag from the item
+// @Description  Deletes a binding between given item and tag
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        item_id  path  string  true  "Item ID"
+// @Param        tag_id   path  string  true  "Tag ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{item_id}/tags/{tag_id} [delete]
+func (h *ItemHandler) UnbindTag(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri unbindTagUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	err := h.itemService.UnbindTagByItemID(ctx.Request.Context(), uri.ItemID, uri.TagID, userID)
 	if err != nil {
 		return err
 	}

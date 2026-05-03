@@ -79,7 +79,7 @@ func main() {
 	var (
 		authService     = services.NewAuthService(userRepo)
 		userService     = services.NewUserService(userRepo)
-		itemService     = services.NewItemService(itemRepo, transactor)
+		itemService     = services.NewItemService(itemRepo, tagRepo, transactor)
 		fileService     = services.NewFileService(fileRepo, transactor, redis, aws)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
 		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
