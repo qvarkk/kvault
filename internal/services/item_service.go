@@ -97,6 +97,12 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 		return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
 	}
 
+	tags, err := s.tagRepo.FindByItemID(ctx, itemID)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "get item tags internal error", err)
+	}
+	item.Tags = append(item.Tags, tags...)
+
 	return item, nil
 }
 

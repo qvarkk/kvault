@@ -164,6 +164,22 @@ func (r *TagRepo) DeleteByID(ctx context.Context, tagID string) error {
 	return toRepositoryError(err)
 }
 
+func (r *TagRepo) FindByItemID(ctx context.Context, itemID string) ([]domain.Tag, error) {
+	sql, args, err := r.queryBuilder.
+		Select("t.*").
+		From("tags t").
+		Join("item_tags it ON it.tag_id = t.id").
+		Where(sq.Eq{"it.item_id": itemID}).
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var tags []domain.Tag
+	err = r.db.SelectContext(ctx, &tags, sql, args...)
+	return tags, toRepositoryError(err)
+}
+
 func (r *TagRepo) FindByItemIDs(
 	ctx context.Context,
 	itemIDs []string,
