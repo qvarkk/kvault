@@ -68,7 +68,7 @@ tidy:
 ## swagger: Generate swagger docs
 swagger:
 	swag init \
-		--dir ./cmd/api,./internal/httpx,./internal/handlers \
+		--dir ./cmd/api,./internal/httpx,./internal/handlers/web \
 		--output $(SWAGGER_OUT)
 
 ## swagger-install: Install swagger dependencies

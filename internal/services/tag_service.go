@@ -16,6 +16,7 @@ type TagRepo interface {
 	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Tag, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Tag) error
 	DeleteByID(context.Context, string) error
+	FindByItemIDs(context.Context, []string) (repositories.ItemTagsByID, error)
 }
 
 type TagService struct {

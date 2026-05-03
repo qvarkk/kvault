@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+type TagRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type TagResponse struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -20,5 +25,12 @@ func toTagResponse(tag *domain.Tag) TagResponse {
 		UserID:    tag.UserID,
 		UpdatedAt: tag.UpdatedAt.Format(time.RFC3339),
 		CreatedAt: tag.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func toTagRef(tag *domain.Tag) TagRef {
+	return TagRef{
+		ID:   tag.ID,
+		Name: tag.Name,
 	}
 }

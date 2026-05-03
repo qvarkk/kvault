@@ -38,29 +38,38 @@ func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) List(ctx context.Context, params domain.ListItemFilter) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
-	offset := uint64(params.PageSize * (params.Page - 1))
+	offset := uint64(f.PageSize * (f.Page - 1))
 	baseQuery := r.queryBuilder.
-		Select().From("items").Where(sq.Eq{"user_id": params.UserID}).
-		Where(sq.Eq{"deleted_at": nil})
+		Select().
+		From("items i").
+		Where(sq.Eq{"i.user_id": f.UserID}).
+		Where(sq.Eq{"i.deleted_at": nil})
 
-	if params.Query != "" {
-		baseQuery = baseQuery.Where("search_vector @@ websearch_to_tsquery('simple', ?)", params.Query)
+	if f.Query != "" {
+		baseQuery = baseQuery.Where("i.search_vector @@ websearch_to_tsquery('simple', ?)", f.Query)
 	}
 
-	if params.Type != "" {
-		baseQuery = baseQuery.Where(sq.Eq{"type": params.Type})
+	if f.Type != "" {
+		baseQuery = baseQuery.Where(sq.Eq{"i.type": f.Type})
+	}
+
+	if len(f.TagIDs) > 0 {
+		baseQuery = baseQuery.
+			Join("item_tags it ON it.item_id = i.id").
+			Where(sq.Eq{"it.tag_id": f.TagIDs}).
+			GroupBy("i.id")
 	}
 
 	// TODO: unify orderby with handler somehow, sql injection possible
 	itemsQuery := baseQuery.
-		Columns("*").
-		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		Columns("i.*").
+		OrderBy(fmt.Sprintf("i.%s %s", f.Column, f.Direction)).
 		Offset(offset).
-		Limit(uint64(params.PageSize))
+		Limit(uint64(f.PageSize))
 	countQuery := baseQuery.Columns("COUNT(*)")
 
 	itemsQuerySql, itemsArgs, err := itemsQuery.ToSql()

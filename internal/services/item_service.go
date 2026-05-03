@@ -69,6 +69,21 @@ func (s *ItemService) List(ctx context.Context, params domain.ListItemFilter) ([
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list items internal error", err)
 	}
+
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.ID
+	}
+
+	tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
+	if err != nil {
+		return nil, 0, NewServiceError(ErrInternal, "get item tags internal error", err)
+	}
+
+	for i := range items {
+		items[i].Tags = tagsByItem[items[i].ID]
+	}
+
 	return items, count, nil
 }
 

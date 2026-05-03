@@ -53,6 +53,8 @@ type Item struct {
 	UpdatedAt    time.Time      `db:"updated_at"`
 	SearchVector string         `db:"search_vector"`
 	DeletedAt    sql.NullTime   `db:"deleted_at"`
+
+	Tags []Tag
 }
 
 type File struct {

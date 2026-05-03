@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type ItemTagsByID map[string][]domain.Tag
+
 type TagRepo struct {
 	db           *sqlx.DB
 	queryBuilder sq.StatementBuilderType
@@ -160,4 +162,52 @@ func (r *TagRepo) DeleteByID(ctx context.Context, tagID string) error {
 
 	_, err = r.db.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
+}
+
+func (r *TagRepo) FindByItemIDs(
+	ctx context.Context,
+	itemIDs []string,
+) (ItemTagsByID, error) {
+	if len(itemIDs) == 0 {
+		return ItemTagsByID{}, nil
+	}
+
+	sql, args, err := r.queryBuilder.
+		Select("t.id", "t.name", "t.user_id", "t.created_at", "t.updated_at", "it.item_id").
+		From("tags t").
+		Join("item_tags it ON it.tag_id = t.id").
+		Where(sq.Eq{"it.item_id": itemIDs}).
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+	defer rows.Close()
+
+	result := make(ItemTagsByID)
+	for rows.Next() {
+		var tag domain.Tag
+		var itemID string
+		err := rows.Scan(
+			&tag.ID,
+			&tag.Name,
+			&tag.UserID,
+			&tag.CreatedAt,
+			&tag.UpdatedAt,
+			&itemID,
+		)
+		if err != nil {
+			return nil, toRepositoryError(err)
+		}
+		result[itemID] = append(result[itemID], tag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	return result, nil
 }

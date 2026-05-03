@@ -37,8 +37,9 @@ type createItemRequest struct {
 }
 
 type listItemQuery struct {
-	Query string `form:"q"`
-	Type  string `form:"type" binding:"omitempty,oneof=text url"`
+	Query  string   `form:"q"`
+	Type   string   `form:"type" binding:"omitempty,oneof=text url"`
+	TagIDs []string `form:"tag_ids" binding:"omitempty,dive,uuid" collectionFormat:"multi"`
 	PaginationParams
 	ItemSortingParams
 }
@@ -103,7 +104,7 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 // @Security     ApiKeyAuth
 // @Accept       json
 // @Produce      json
-// @Param				 params query listItemQuery false "Query parameters"
+// @Param				 params  query listItemQuery false "Query parameters"
 // @Success      200   {object}  PaginatedResponse[ItemResponse]
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
@@ -120,6 +121,7 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 	params := domain.ListItemFilter{
 		UserID: userID,
 		Type:   query.Type,
+		TagIDs: query.TagIDs,
 		QueryFilter: domain.QueryFilter{
 			Query: query.Query,
 		},
