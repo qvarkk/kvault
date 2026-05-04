@@ -5,12 +5,9 @@ import (
 	"context"
 	"io"
 	"os"
-	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
 	"strings"
 
-	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jmoiron/sqlx"
 	"github.com/ledongthuc/pdf"
 )
@@ -30,26 +27,23 @@ type FileTaskRepo interface {
 type FileTaskService struct {
 	fileRepo   FileTaskRepo
 	transactor Transactor
-	aws        *aws.Aws
+	storage    FileStorage
 }
 
-func NewFileTaskService(fileRepo FileTaskRepo, transactor Transactor, aws *aws.Aws) *FileTaskService {
+func NewFileTaskService(fileRepo FileTaskRepo, transactor Transactor, storage FileStorage) *FileTaskService {
 	return &FileTaskService{
 		fileRepo:   fileRepo,
 		transactor: transactor,
-		aws:        aws,
+		storage:    storage,
 	}
 }
 
 func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.File) (string, error) {
-	resp, err := s.aws.S3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: awsSdk.String(s.aws.BucketName),
-		Key:    awsSdk.String(file.S3Key),
-	})
+	body, err := s.storage.Get(ctx, file.S3Key)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer body.Close()
 
 	tmpFile, err := os.CreateTemp("", "*.pdf")
 	if err != nil {
@@ -58,7 +52,7 @@ func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.
 	defer tmpFile.Close()
 	defer os.Remove(tmpFile.Name())
 
-	_, err = io.Copy(tmpFile, resp.Body)
+	_, err = io.Copy(tmpFile, body)
 	if err != nil {
 		return "", err
 	}

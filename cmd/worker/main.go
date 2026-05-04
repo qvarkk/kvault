@@ -42,7 +42,7 @@ func main() {
 	}
 	defer pg.Close()
 
-	aws, err := aws.NewAws(config.Aws)
+	aws, err := aws.NewAwsStorage(config.Aws)
 	if err != nil {
 		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
 	}

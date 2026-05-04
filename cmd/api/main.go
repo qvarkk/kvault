@@ -57,12 +57,12 @@ func main() {
 		DB:       0,
 	}
 
-	redis, err := redis.NewRedis(redisConfig)
+	asynq, err := redis.NewAsynqEnqueuer(redisConfig)
 	if err != nil {
-		logger.Logger.Fatal("Connection to Redis failed", zap.Error(err))
+		logger.Logger.Fatal("Asynq connection to Redis failed", zap.Error(err))
 	}
 
-	aws, err := aws.NewAws(config.Aws)
+	aws, err := aws.NewAwsStorage(config.Aws)
 	if err != nil {
 		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
 	}
@@ -80,7 +80,7 @@ func main() {
 		authService     = services.NewAuthService(userRepo)
 		userService     = services.NewUserService(userRepo)
 		itemService     = services.NewItemService(itemRepo, tagRepo, transactor)
-		fileService     = services.NewFileService(fileRepo, transactor, redis, aws)
+		fileService     = services.NewFileService(fileRepo, transactor, asynq, aws)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
 		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
 	)

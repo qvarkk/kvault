@@ -2,21 +2,13 @@ package services
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"path/filepath"
-	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/redis"
-	"qvarkk/kvault/internal/tasks"
-	"time"
 
-	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -33,8 +25,8 @@ type FileRepo interface {
 type FileService struct {
 	fileRepo   FileRepo
 	transactor Transactor
-	redis      *redis.Redis
-	aws        *aws.Aws
+	tasker     TaskEnqueuer
+	storage    FileStorage
 }
 
 type CreateFileInput struct {
@@ -46,16 +38,88 @@ type CreateFileInput struct {
 	Status       string
 }
 
-func NewFileService(fileRepo FileRepo, transactor Transactor, redis *redis.Redis, aws *aws.Aws) *FileService {
+func NewFileService(fileRepo FileRepo, transactor Transactor, tasker TaskEnqueuer, storage FileStorage) *FileService {
 	return &FileService{
 		fileRepo:   fileRepo,
 		transactor: transactor,
-		redis:      redis,
-		aws:        aws,
+		tasker:     tasker,
+		storage:    storage,
 	}
 }
 
-func (s *FileService) CreateNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
+func (s *FileService) Upload(
+	ctx context.Context,
+	userID string,
+	fileHeader *multipart.FileHeader,
+) (*domain.File, error) {
+	body, err := s.validatePdfAndOpenFile(fileHeader)
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	s3Key := uuid.New().String() + ".pdf"
+	err = s.storage.Upload(ctx, s3Key, body)
+	if err != nil {
+		return nil, err
+	}
+
+	fileInput := CreateFileInput{
+		UserID:       userID,
+		OriginalName: fileHeader.Filename,
+		S3Key:        s3Key,
+		Size:         fileHeader.Size,
+		MimeType:     fileHeader.Header.Get("Content-Type"),
+		Status:       string(domain.FileStatusUploading),
+	}
+
+	file, err := s.createNew(ctx, fileInput)
+	if err != nil {
+		_ = s.storage.Delete(ctx, s3Key)
+		return nil, err
+	}
+
+	err = s.tasker.EnqueuePdfProcess(ctx, userID, file.ID)
+	if err != nil {
+		_ = s.storage.Delete(ctx, s3Key)
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (s *FileService) validatePdfAndOpenFile(fileHeader *multipart.FileHeader) (io.ReadCloser, error) {
+	ext := filepath.Ext(fileHeader.Filename)
+	if ext != ".pdf" {
+		return nil, NewServiceError(ErrPdfFileFormat, "invalid file extension", nil)
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "failed to open uploaded file", err)
+	}
+
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil {
+		file.Close()
+		return nil, NewServiceError(ErrInternal, "failed to read uploaded file", err)
+	}
+
+	contentType := http.DetectContentType(buffer[:n])
+	if contentType != "application/pdf" {
+		file.Close()
+		return nil, NewServiceError(ErrPdfFileFormat, "invalid file content type", nil)
+	}
+
+	if seeker, ok := file.(io.Seeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	}
+
+	return file, nil
+}
+
+func (s *FileService) createNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
 	file := &domain.File{
 		UserID:       input.UserID,
 		OriginalName: input.OriginalName,
@@ -91,22 +155,13 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
 	}
 
-	presignClient := s3.NewPresignClient(s.aws.S3Client)
-	contentDispositionParam := fmt.Sprintf(
-		"attachment; filename*=UTF-8''%s",
-		url.PathEscape(file.OriginalName),
-	)
-
-	presignedResult, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:                     awsSdk.String(s.aws.BucketName),
-		Key:                        awsSdk.String(file.S3Key),
-		ResponseContentDisposition: awsSdk.String(contentDispositionParam),
-	}, s3.WithPresignExpires(time.Second*time.Duration(s.aws.UrlExpirationTimeSeconds)))
-
-	expiresAt := time.Now().UTC().Add(time.Second * time.Duration(s.aws.UrlExpirationTimeSeconds))
+	url, expiresAt, err := s.storage.GeneratePresignUrl(ctx, file.S3Key, file.OriginalName)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "generate presign url error", err)
+	}
 
 	return &domain.PresignedURL{
-		URL:       presignedResult.URL,
+		URL:       url,
 		Filename:  file.OriginalName,
 		MimeType:  file.MimeType,
 		Size:      file.Size,
@@ -154,61 +209,4 @@ func (s *FileService) authorizeAndMutateTx(
 	})
 
 	return err
-}
-
-func (s *FileService) ValidatePdfFile(ctx context.Context, fileHeader *multipart.FileHeader) error {
-	ext := filepath.Ext(fileHeader.Filename)
-	if ext != ".pdf" {
-		return NewServiceError(ErrPdfFileFormat, "invalid file extension", nil)
-	}
-
-	file, err := fileHeader.Open()
-	if err != nil {
-		return NewServiceError(ErrInternal, "failed to open uploaded file", err)
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 512)
-	n, err := file.Read(buffer)
-	if err != nil {
-		return NewServiceError(ErrInternal, "failed to read uploaded file", err)
-	}
-
-	contentType := http.DetectContentType(buffer[:n])
-	if contentType != "application/pdf" {
-		return NewServiceError(ErrPdfFileFormat, "invalid file content type", nil)
-	}
-
-	return nil
-}
-
-func (s *FileService) UploadPdfFileToS3(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
-	file, err := fileHeader.Open()
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	filename := uuid.New().String() + ".pdf"
-	_, err = s.aws.S3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: awsSdk.String(s.aws.BucketName),
-		Key:    awsSdk.String(s.aws.GetKey(filename)),
-		Body:   file,
-	})
-
-	return s.aws.GetKey(filename), err
-}
-
-func (s *FileService) EnqueuePdfProcessTask(ctx context.Context, payload tasks.PdfProcessPayload) (*asynq.TaskInfo, error) {
-	task, err := tasks.NewPdfProcessTask(payload)
-	if err != nil {
-		return nil, NewServiceError(ErrInternal, "failed to create PDF processing task", err)
-	}
-
-	info, err := s.redis.AsynqClient.EnqueueContext(ctx, task)
-	if err != nil {
-		return nil, NewServiceError(ErrInternal, "failed to enqueue PDF processing task", err)
-	}
-
-	return info, nil
 }

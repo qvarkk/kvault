@@ -5,22 +5,16 @@ import (
 	"mime/multipart"
 	"net/http"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/internal/services"
-	"qvarkk/kvault/internal/tasks"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
 )
 
 type FileService interface {
-	CreateNew(context.Context, services.CreateFileInput) (*domain.File, error)
+	Upload(context.Context, string, *multipart.FileHeader) (*domain.File, error)
 	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
 	RestoreByID(ctx context.Context, fileID, userID string) error
-	ValidatePdfFile(context.Context, *multipart.FileHeader) error
-	UploadPdfFileToS3(context.Context, *multipart.FileHeader) (string, error)
-	EnqueuePdfProcessTask(context.Context, tasks.PdfProcessPayload) (*asynq.TaskInfo, error)
 }
 
 type FileHandler struct {
@@ -69,36 +63,7 @@ func (h *FileHandler) UploadFile(ctx *gin.Context) error {
 		return err
 	}
 
-	err := h.fileService.ValidatePdfFile(ctx, form.File)
-	if err != nil {
-		return err
-	}
-
-	s3Key, err := h.fileService.UploadPdfFileToS3(ctx, form.File)
-	if err != nil {
-		return err
-	}
-
-	fileInput := services.CreateFileInput{
-		UserID:       userID,
-		OriginalName: form.File.Filename,
-		S3Key:        s3Key,
-		Size:         form.File.Size,
-		MimeType:     form.File.Header.Get("Content-Type"),
-		Status:       string(domain.FileStatusUploading),
-	}
-
-	file, err := h.fileService.CreateNew(ctx.Request.Context(), fileInput)
-	if err != nil {
-		return err
-	}
-
-	payload := tasks.PdfProcessPayload{
-		UserID: userID,
-		FileID: file.ID,
-	}
-
-	_, err = h.fileService.EnqueuePdfProcessTask(ctx, payload)
+	file, err := h.fileService.Upload(ctx, userID, form.File)
 	if err != nil {
 		return err
 	}
