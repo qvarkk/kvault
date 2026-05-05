@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 )
@@ -11,6 +13,7 @@ type Config struct {
 	Api    ApiConfig
 	DB     DBConfig
 	Redis  RedisConfig
+	Cache  CacheConfig
 	Aws    AwsConfig
 	Worker WorkerConfig
 }
@@ -32,6 +35,14 @@ type RedisConfig struct {
 	Port     int    `default:"6379"`
 	User     string `required:"true"`
 	Password string `required:"true"`
+}
+
+type CacheConfig struct {
+	Enabled      bool          `default:"true"`
+	ItemsTtl     time.Duration `default:"5m"`
+	FilesTtl     time.Duration `default:"5m"`
+	TagsTtl      time.Duration `default:"15m"`
+	StopwordsTtl time.Duration `default:"30m"`
 }
 
 type AwsConfig struct {
