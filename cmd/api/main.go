@@ -55,10 +55,10 @@ func main() {
 		Username: config.Redis.User,
 		Password: config.Redis.Password,
 	}
-	asynqConfig := redisConnConfig
-	asynqConfig.DB = 0
+	queueConfig := redisConnConfig
+	queueConfig.DB = config.Redis.QueueDb
 
-	enqueuer, err := redis.NewAsynqEnqueuer(asynqConfig)
+	enqueuer, err := redis.NewAsynqEnqueuer(queueConfig)
 	if err != nil {
 		logger.Logger.Fatal("Asynq connection to Redis failed", zap.Error(err))
 	}
@@ -74,7 +74,7 @@ func main() {
 	var cacheStore services.CacheStore
 	if config.Cache.Enabled {
 		storeConfig := redisConnConfig
-		storeConfig.DB = 1
+		storeConfig.DB = config.Redis.CacheDb
 		redisClient, err := redis.NewRedisStore(storeConfig, cacheConfig)
 		if err != nil {
 			logger.Logger.Fatal("Cache connection to Redis failed", zap.Error(err))

@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	Debug bool `default:"false"`
+	Debug bool `default:"true"`
 
 	Api    ApiConfig
 	DB     DBConfig
@@ -23,7 +23,7 @@ type ApiConfig struct {
 }
 
 type DBConfig struct {
-	Host     string `required:"true"`
+	Host     string `default:"localhost"`
 	Port     int    `default:"5432"`
 	Database string `required:"true"`
 	Username string `required:"true"`
@@ -35,6 +35,8 @@ type RedisConfig struct {
 	Port     int    `default:"6379"`
 	User     string `required:"true"`
 	Password string `required:"true"`
+	QueueDb  int    `default:"0" envconfig:"QUEUE_DB"`
+	CacheDb  int    `default:"1" envconfig:"CACHE_DB"`
 }
 
 type CacheConfig struct {
@@ -46,12 +48,12 @@ type CacheConfig struct {
 }
 
 type AwsConfig struct {
-	AccessKeyID              string `envconfig:"ACCESS_KEY_ID"`
-	SecretAccessKey          string `envconfig:"SECRET_ACCESS_KEY"`
-	Region                   string `envconfig:"REGION"`
-	EndpointUrl              string `envconfig:"ENDPOINT_URL"`
-	S3Bucket                 string `envconfig:"S3_BUCKET"`
-	UrlExpirationTimeSeconds int    `envconfig:"URL_EXPIRATION_TIME_SECONDS" default:"60"`
+	AccessKeyID              string `required:"true" envconfig:"ACCESS_KEY_ID"`
+	SecretAccessKey          string `required:"true" envconfig:"SECRET_ACCESS_KEY"`
+	Region                   string `required:"true" envconfig:"REGION"`
+	EndpointUrl              string `required:"true" envconfig:"ENDPOINT_URL"`
+	S3Bucket                 string `required:"true" envconfig:"S3_BUCKET"`
+	UrlExpirationTimeSeconds int    `default:"60"    envconfig:"URL_EXPIRATION_TIME_SECONDS"`
 }
 
 type WorkerConfig struct {
