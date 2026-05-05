@@ -2,9 +2,16 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"qvarkk/kvault/logger"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 type ItemRepo interface {
@@ -21,9 +28,11 @@ type ItemRepo interface {
 }
 
 type ItemService struct {
-	itemRepo   ItemRepo
-	tagRepo    TagRepo
-	transactor Transactor
+	itemRepo     ItemRepo
+	tagRepo      TagRepo
+	transactor   Transactor
+	cache        CacheStore
+	itemCacheTtl time.Duration
 }
 
 type CreateItemInput struct {
@@ -40,11 +49,24 @@ type UpdateItemInput struct {
 	Content *string
 }
 
-func NewItemService(itemRepo ItemRepo, tagRepo TagRepo, transactor Transactor) *ItemService {
+type cachedItemList struct {
+	Items []domain.Item
+	Count int
+}
+
+func NewItemService(
+	itemRepo ItemRepo,
+	tagRepo TagRepo,
+	transactor Transactor,
+	cache CacheStore,
+	cacheTtl time.Duration,
+) *ItemService {
 	return &ItemService{
-		itemRepo:   itemRepo,
-		tagRepo:    tagRepo,
-		transactor: transactor,
+		itemRepo:     itemRepo,
+		tagRepo:      tagRepo,
+		transactor:   transactor,
+		cache:        cache,
+		itemCacheTtl: cacheTtl,
 	}
 }
 
@@ -61,33 +83,73 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 		return nil, NewServiceError(ErrItemNotCreated, "database error", err)
 	}
 
+	s.invalidateItemListCache(ctx, input.UserID)
+
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, params domain.ListItemFilter) ([]domain.Item, int, error) {
-	items, count, err := s.itemRepo.List(ctx, params)
+func (s *ItemService) List(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+	version, err := s.itemListVersion(ctx, f.UserID)
+	if err != nil {
+		logger.Logger.Warn("failed to get item list cache version",
+			zap.String("userID", f.UserID),
+			zap.Error(err),
+		)
+	}
+
+	cacheKey := itemListKey(version, f)
+	if cached, err := s.cache.Get(ctx, cacheKey); err == nil && cached != nil {
+		var result cachedItemList
+		if err := json.Unmarshal(cached, &result); err == nil {
+			return result.Items, result.Count, nil
+		}
+	}
+
+	items, count, err := s.itemRepo.List(ctx, f)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list items internal error", err)
 	}
 
-	ids := make([]string, len(items))
-	for i, item := range items {
-		ids[i] = item.ID
+	if len(items) > 0 {
+		ids := make([]string, len(items))
+		for i, item := range items {
+			ids[i] = item.ID
+		}
+
+		tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
+		if err != nil {
+			return nil, 0, NewServiceError(ErrInternal, "get item tags internal error", err)
+		}
+
+		for i := range items {
+			items[i].Tags = tagsByItem[items[i].ID]
+		}
 	}
 
-	tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
-	if err != nil {
-		return nil, 0, NewServiceError(ErrInternal, "get item tags internal error", err)
-	}
-
-	for i := range items {
-		items[i].Tags = tagsByItem[items[i].ID]
+	if payload, err := json.Marshal(cachedItemList{Items: items, Count: count}); err == nil {
+		if err := s.cache.Set(ctx, cacheKey, payload, s.itemCacheTtl); err != nil {
+			logger.Logger.Warn("failed to set item list cache",
+				zap.String("key", cacheKey),
+				zap.Error(err),
+			)
+		}
 	}
 
 	return items, count, nil
 }
 
 func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error) {
+	cacheKey := itemKey(itemID)
+	if cached, err := s.cache.Get(ctx, cacheKey); err == nil && cached != nil {
+		var item domain.Item
+		if err := json.Unmarshal(cached, &item); err == nil {
+			if item.UserID != userID {
+				return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
+			}
+			return &item, nil
+		}
+	}
+
 	item, err := s.itemRepo.GetByID(ctx, itemID)
 	if err != nil {
 		return nil, NewServiceError(ErrItemNotFound, "not found", err)
@@ -102,6 +164,15 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 		return nil, NewServiceError(ErrInternal, "get item tags internal error", err)
 	}
 	item.Tags = append(item.Tags, tags...)
+
+	if payload, err := json.Marshal(item); err == nil {
+		if err := s.cache.Set(ctx, cacheKey, payload, s.itemCacheTtl); err != nil {
+			logger.Logger.Warn("failed to set item cache",
+				zap.String("key", cacheKey),
+				zap.Error(err),
+			)
+		}
+	}
 
 	return item, nil
 }
@@ -133,8 +204,14 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 		updated = item
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return updated, err
+	s.invalidateItemCache(ctx, input.ItemID)
+	s.invalidateItemListCache(ctx, input.UserID)
+
+	return updated, nil
 }
 
 func (s *ItemService) DeleteByID(ctx context.Context, itemID, userID string) error {
@@ -175,8 +252,14 @@ func (s *ItemService) authorizeAndMutateTx(
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	s.invalidateItemCache(ctx, itemID)
+	s.invalidateItemListCache(ctx, userID)
+
+	return nil
 }
 
 func (s *ItemService) BindTagByItemID(
@@ -198,7 +281,7 @@ func (s *ItemService) authorizeAndBindTagTx(
 	itemID, tagID, userID string,
 	bindFn func(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error,
 ) error {
-	return s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
 		item, err := s.itemRepo.GetActiveByIDForUpdate(ctx, tx, itemID)
 		if err != nil {
 			return NewServiceError(ErrItemNotFound, "not found", err)
@@ -225,4 +308,59 @@ func (s *ItemService) authorizeAndBindTagTx(
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	s.invalidateItemCache(ctx, itemID)
+	s.invalidateItemListCache(ctx, userID)
+
+	return nil
+}
+
+func itemKey(itemID string) string {
+	return fmt.Sprintf("item:%s", itemID)
+}
+
+func itemListVersionKey(userID string) string {
+	return fmt.Sprintf("items:version:user:%s", userID)
+}
+
+func itemListKey(version int64, f domain.ListItemFilter) string {
+	return fmt.Sprintf(
+		"items:list:v%d:user:%s:type:%s:page:%d:size:%d:dir:%s:col:%s:q:%s:tags:%s",
+		version, f.UserID, f.Type, f.Page, f.PageSize, f.Direction, f.Column, f.Query,
+		strings.Join(f.TagIDs, ","),
+	)
+}
+
+func (s *ItemService) itemListVersion(ctx context.Context, userID string) (int64, error) {
+	key := itemListVersionKey(userID)
+	val, err := s.cache.Get(ctx, key)
+	if err != nil {
+		return 0, err
+	}
+	if val == nil {
+		return 0, nil
+	}
+	return strconv.ParseInt(string(val), 10, 64)
+}
+
+func (s *ItemService) invalidateItemListCache(ctx context.Context, userID string) {
+	_, err := s.cache.Incr(ctx, itemListVersionKey(userID))
+	if err != nil {
+		logger.Logger.Warn("failed to invalidate item list cache",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+	}
+}
+
+func (s *ItemService) invalidateItemCache(ctx context.Context, itemID string) {
+	if err := s.cache.Del(ctx, itemKey(itemID)); err != nil {
+		logger.Logger.Warn("failed to delete item cache",
+			zap.String("itemID", itemID),
+			zap.Error(err),
+		)
+	}
 }

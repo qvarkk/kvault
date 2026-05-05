@@ -12,7 +12,7 @@ type AsynqEnqueuer struct {
 	client *asynq.Client
 }
 
-func NewAsynqEnqueuer(config Config) (*AsynqEnqueuer, error) {
+func NewAsynqEnqueuer(config ConnConfig) (*AsynqEnqueuer, error) {
 	asynqOpt := asynq.RedisClientOpt{
 		Addr:     config.Addr,
 		Username: config.Username,

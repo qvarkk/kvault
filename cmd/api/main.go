@@ -50,16 +50,38 @@ func main() {
 	}
 	defer pg.Close()
 
-	redisConfig := redis.Config{
+	redisConnConfig := redis.ConnConfig{
 		Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
 		Username: config.Redis.User,
 		Password: config.Redis.Password,
-		DB:       0,
 	}
+	asynqConfig := redisConnConfig
+	asynqConfig.DB = 0
 
-	asynq, err := redis.NewAsynqEnqueuer(redisConfig)
+	enqueuer, err := redis.NewAsynqEnqueuer(asynqConfig)
 	if err != nil {
 		logger.Logger.Fatal("Asynq connection to Redis failed", zap.Error(err))
+	}
+
+	cacheConfig := redis.CacheConfig{
+		IsEnabled:    config.Cache.Enabled,
+		ItemsTtl:     config.Cache.ItemsTtl,
+		FilesTtl:     config.Cache.FilesTtl,
+		TagsTtl:      config.Cache.TagsTtl,
+		StopwordsTtl: config.Cache.StopwordsTtl,
+	}
+
+	var cacheStore services.CacheStore
+	if config.Cache.Enabled {
+		storeConfig := redisConnConfig
+		storeConfig.DB = 1
+		redisClient, err := redis.NewRedisStore(storeConfig, cacheConfig)
+		if err != nil {
+			logger.Logger.Fatal("Cache connection to Redis failed", zap.Error(err))
+		}
+		cacheStore = redisClient
+	} else {
+		cacheStore = redis.NewNoopCache()
 	}
 
 	aws, err := aws.NewAwsStorage(config.Aws)
@@ -79,8 +101,8 @@ func main() {
 	var (
 		authService     = services.NewAuthService(userRepo)
 		userService     = services.NewUserService(userRepo)
-		itemService     = services.NewItemService(itemRepo, tagRepo, transactor)
-		fileService     = services.NewFileService(fileRepo, transactor, asynq, aws)
+		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, cacheConfig.ItemsTtl)
+		fileService     = services.NewFileService(fileRepo, transactor, enqueuer, aws)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
 		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
 	)
