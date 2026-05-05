@@ -3,8 +3,10 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repositories"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -23,8 +25,10 @@ type StopwordRepo interface {
 }
 
 type StopwordService struct {
-	stopwordRepo StopwordRepo
-	transactor   Transactor
+	stopwordRepo     StopwordRepo
+	transactor       Transactor
+	cache            CacheStore
+	stopwordCacheTtl time.Duration
 }
 
 type CreateStopwordInput struct {
@@ -32,10 +36,17 @@ type CreateStopwordInput struct {
 	Word   string
 }
 
-func NewStopwordService(stopwordRepo StopwordRepo, transactor Transactor) *StopwordService {
+func NewStopwordService(
+	stopwordRepo StopwordRepo,
+	transactor Transactor,
+	cache CacheStore,
+	cacheTtl time.Duration,
+) *StopwordService {
 	return &StopwordService{
-		stopwordRepo: stopwordRepo,
-		transactor:   transactor,
+		stopwordRepo:     stopwordRepo,
+		transactor:       transactor,
+		cache:            cache,
+		stopwordCacheTtl: cacheTtl,
 	}
 }
 
@@ -55,19 +66,31 @@ func (s *StopwordService) CreateNew(ctx context.Context, input CreateStopwordInp
 		return nil, NewServiceError(ErrStopwordNotCreated, "database error", err)
 	}
 
+	invalidateListCache(ctx, s.cache, stopwordListVersionKey(input.UserID))
+
 	return stopword, nil
 }
 
-func (s *StopwordService) List(ctx context.Context, params domain.ListStopwordFilter) ([]domain.Stopword, error) {
-	stopwords, err := s.stopwordRepo.GetActiveStopwords(ctx, params)
+func (s *StopwordService) List(ctx context.Context, f domain.ListStopwordFilter) ([]domain.Stopword, error) {
+	version := listVersion(ctx, s.cache, stopwordListVersionKey(f.UserID))
+	cacheKey := stopwordListKey(version, f)
+
+	if cached := getFromCache[[]domain.Stopword](ctx, s.cache, cacheKey); cached != nil {
+		return *cached, nil
+	}
+
+	stopwords, err := s.stopwordRepo.GetActiveStopwords(ctx, f)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "list stopwords internal error", err)
 	}
+
+	setToCache(ctx, s.cache, cacheKey, stopwords, s.stopwordCacheTtl)
+
 	return stopwords, nil
 }
 
 func (s *StopwordService) Enable(ctx context.Context, word string, userID string) error {
-	return s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
 		isDefault, err := s.stopwordRepo.IsDefaultTx(ctx, tx, word)
 		if err != nil {
 			return NewServiceError(ErrInternal, "check default", err)
@@ -93,10 +116,17 @@ func (s *StopwordService) Enable(ctx context.Context, word string, userID string
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	invalidateListCache(ctx, s.cache, stopwordListVersionKey(userID))
+
+	return nil
 }
 
 func (s *StopwordService) Disable(ctx context.Context, word string, userID string) error {
-	return s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
 		isDefault, err := s.stopwordRepo.IsDefaultTx(ctx, tx, word)
 		if err != nil {
 			return NewServiceError(ErrInternal, "check default", err)
@@ -129,6 +159,13 @@ func (s *StopwordService) Disable(ctx context.Context, word string, userID strin
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	invalidateListCache(ctx, s.cache, stopwordListVersionKey(userID))
+
+	return nil
 }
 
 func (s *StopwordService) Delete(
@@ -145,5 +182,18 @@ func (s *StopwordService) Delete(
 		return NewServiceError(ErrInternal, "delete stopword internal error", err)
 	}
 
+	invalidateListCache(ctx, s.cache, stopwordListVersionKey(userID))
+
 	return nil
+}
+
+func stopwordListVersionKey(userID string) string {
+	return fmt.Sprintf("stopwords:version:user:%s", userID)
+}
+
+func stopwordListKey(version int64, f domain.ListStopwordFilter) string {
+	return fmt.Sprintf(
+		"stopwords:list:v%d:user:%s:source:%s:dir:%s:col:%s:q:%s",
+		version, f.UserID, f.Source, f.Direction, f.Column, f.Query,
+	)
 }

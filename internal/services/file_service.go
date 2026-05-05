@@ -2,20 +2,16 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/logger"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"go.uber.org/zap"
 )
 
 type FileRepo interface {
@@ -44,11 +40,6 @@ type CreateFileInput struct {
 	Size         int64
 	MimeType     string
 	Status       string
-}
-
-type cachedFileList struct {
-	Files []domain.File
-	Count int
 }
 
 func NewFileService(
@@ -107,7 +98,7 @@ func (s *FileService) Upload(
 		return nil, err
 	}
 
-	s.invalidateFileListCache(ctx, userID)
+	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
 
 	return file, nil
 }
@@ -162,20 +153,11 @@ func (s *FileService) createNew(ctx context.Context, input CreateFileInput) (*do
 }
 
 func (s *FileService) List(ctx context.Context, f domain.ListFileFilter) ([]domain.File, int, error) {
-	version, err := s.fileListVersion(ctx, f.UserID)
-	if err != nil {
-		logger.Logger.Warn("failed to get file list cache version",
-			zap.String("userID", f.UserID),
-			zap.Error(err),
-		)
-	}
-
+	version := listVersion(ctx, s.cache, fileListVersionKey(f.UserID))
 	cacheKey := fileListKey(version, f)
-	if cached, err := s.cache.Get(ctx, cacheKey); err == nil && cached != nil {
-		var result cachedFileList
-		if err := json.Unmarshal(cached, &result); err == nil {
-			return result.Files, result.Count, nil
-		}
+
+	if cached := getFromCache[cachedList[domain.File]](ctx, s.cache, cacheKey); cached != nil {
+		return cached.Entities, cached.Count, nil
 	}
 
 	files, count, err := s.fileRepo.List(ctx, f)
@@ -183,14 +165,7 @@ func (s *FileService) List(ctx context.Context, f domain.ListFileFilter) ([]doma
 		return nil, 0, NewServiceError(ErrInternal, "list files internal error", err)
 	}
 
-	if payload, err := json.Marshal(cachedFileList{Files: files, Count: count}); err == nil {
-		if err := s.cache.Set(ctx, cacheKey, payload, s.fileCacheTtl); err != nil {
-			logger.Logger.Warn("failed to set file list cache",
-				zap.String("key", cacheKey),
-				zap.Error(err),
-			)
-		}
-	}
+	setToCache(ctx, s.cache, cacheKey, cachedList[domain.File]{Entities: files, Count: count}, s.fileCacheTtl)
 
 	return files, count, err
 }
@@ -261,7 +236,7 @@ func (s *FileService) authorizeAndMutateTx(
 		return err
 	}
 
-	s.invalidateFileListCache(ctx, userID)
+	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
 
 	return nil
 }
@@ -272,29 +247,7 @@ func fileListVersionKey(userID string) string {
 
 func fileListKey(version int64, f domain.ListFileFilter) string {
 	return fmt.Sprintf(
-		"files:list:v%d:user:%s:mime:%s:page:%d:size:%d:dis:%s:col:%s:q:%s",
+		"files:list:v%d:user:%s:mime:%s:page:%d:size:%d:dir:%s:col:%s:q:%s",
 		version, f.UserID, f.MimeType, f.Page, f.PageSize, f.Direction, f.Column, f.Query,
 	)
-}
-
-func (s *FileService) fileListVersion(ctx context.Context, userID string) (int64, error) {
-	key := fileListVersionKey(userID)
-	val, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return 0, err
-	}
-	if val == nil {
-		return 0, err
-	}
-	return strconv.ParseInt(string(val), 10, 64)
-}
-
-func (s *FileService) invalidateFileListCache(ctx context.Context, userID string) {
-	_, err := s.cache.Incr(ctx, fileListVersionKey(userID))
-	if err != nil {
-		logger.Logger.Warn("failed to invalidate file list cache",
-			zap.String("userID", userID),
-			zap.Error(err),
-		)
-	}
 }

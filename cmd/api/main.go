@@ -101,9 +101,9 @@ func main() {
 	var (
 		authService     = services.NewAuthService(userRepo)
 		userService     = services.NewUserService(userRepo)
-		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, cacheConfig.ItemsTtl) 
+		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, cacheConfig.ItemsTtl)
 		fileService     = services.NewFileService(fileRepo, transactor, enqueuer, aws, cacheStore, cacheConfig.FilesTtl)
-		stopwordService = services.NewStopwordService(stopwordRepo, transactor)
+		stopwordService = services.NewStopwordService(stopwordRepo, transactor, cacheStore, cacheConfig.StopwordsTtl)
 		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
 	)
 

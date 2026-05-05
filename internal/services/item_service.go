@@ -2,16 +2,12 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
-	"qvarkk/kvault/logger"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"go.uber.org/zap"
 )
 
 type ItemRepo interface {
@@ -83,26 +79,17 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 		return nil, NewServiceError(ErrItemNotCreated, "database error", err)
 	}
 
-	s.invalidateItemListCache(ctx, input.UserID)
+	invalidateListCache(ctx, s.cache, itemListVersionKey(input.UserID))
 
 	return item, nil
 }
 
 func (s *ItemService) List(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
-	version, err := s.itemListVersion(ctx, f.UserID)
-	if err != nil {
-		logger.Logger.Warn("failed to get item list cache version",
-			zap.String("userID", f.UserID),
-			zap.Error(err),
-		)
-	}
-
+	version := listVersion(ctx, s.cache, itemListVersionKey(f.UserID))
 	cacheKey := itemListKey(version, f)
-	if cached, err := s.cache.Get(ctx, cacheKey); err == nil && cached != nil {
-		var result cachedItemList
-		if err := json.Unmarshal(cached, &result); err == nil {
-			return result.Items, result.Count, nil
-		}
+
+	if cached := getFromCache[cachedList[domain.Item]](ctx, s.cache, cacheKey); cached != nil {
+		return cached.Entities, cached.Count, nil
 	}
 
 	items, count, err := s.itemRepo.List(ctx, f)
@@ -126,28 +113,18 @@ func (s *ItemService) List(ctx context.Context, f domain.ListItemFilter) ([]doma
 		}
 	}
 
-	if payload, err := json.Marshal(cachedItemList{Items: items, Count: count}); err == nil {
-		if err := s.cache.Set(ctx, cacheKey, payload, s.itemCacheTtl); err != nil {
-			logger.Logger.Warn("failed to set item list cache",
-				zap.String("key", cacheKey),
-				zap.Error(err),
-			)
-		}
-	}
+	setToCache(ctx, s.cache, cacheKey, cachedList[domain.Item]{Entities: items, Count: count}, s.itemCacheTtl)
 
 	return items, count, nil
 }
 
 func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error) {
 	cacheKey := itemKey(itemID)
-	if cached, err := s.cache.Get(ctx, cacheKey); err == nil && cached != nil {
-		var item domain.Item
-		if err := json.Unmarshal(cached, &item); err == nil {
-			if item.UserID != userID {
-				return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
-			}
-			return &item, nil
+	if item := getFromCache[domain.Item](ctx, s.cache, cacheKey); item != nil {
+		if item.UserID != userID {
+			return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
 		}
+		return item, nil
 	}
 
 	item, err := s.itemRepo.GetByID(ctx, itemID)
@@ -165,14 +142,7 @@ func (s *ItemService) GetByID(ctx context.Context, itemID, userID string) (*doma
 	}
 	item.Tags = append(item.Tags, tags...)
 
-	if payload, err := json.Marshal(item); err == nil {
-		if err := s.cache.Set(ctx, cacheKey, payload, s.itemCacheTtl); err != nil {
-			logger.Logger.Warn("failed to set item cache",
-				zap.String("key", cacheKey),
-				zap.Error(err),
-			)
-		}
-	}
+	setToCache(ctx, s.cache, cacheKey, item, s.itemCacheTtl)
 
 	return item, nil
 }
@@ -208,8 +178,8 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 		return nil, err
 	}
 
-	s.invalidateItemCache(ctx, input.ItemID)
-	s.invalidateItemListCache(ctx, input.UserID)
+	invalidateSingleCache(ctx, s.cache, itemKey(input.ItemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(input.UserID))
 
 	return updated, nil
 }
@@ -256,8 +226,8 @@ func (s *ItemService) authorizeAndMutateTx(
 		return err
 	}
 
-	s.invalidateItemCache(ctx, itemID)
-	s.invalidateItemListCache(ctx, userID)
+	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
 
 	return nil
 }
@@ -312,8 +282,8 @@ func (s *ItemService) authorizeAndBindTagTx(
 		return err
 	}
 
-	s.invalidateItemCache(ctx, itemID)
-	s.invalidateItemListCache(ctx, userID)
+	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
 
 	return nil
 }
@@ -332,35 +302,4 @@ func itemListKey(version int64, f domain.ListItemFilter) string {
 		version, f.UserID, f.Type, f.Page, f.PageSize, f.Direction, f.Column, f.Query,
 		strings.Join(f.TagIDs, ","),
 	)
-}
-
-func (s *ItemService) itemListVersion(ctx context.Context, userID string) (int64, error) {
-	key := itemListVersionKey(userID)
-	val, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return 0, err
-	}
-	if val == nil {
-		return 0, nil
-	}
-	return strconv.ParseInt(string(val), 10, 64)
-}
-
-func (s *ItemService) invalidateItemListCache(ctx context.Context, userID string) {
-	_, err := s.cache.Incr(ctx, itemListVersionKey(userID))
-	if err != nil {
-		logger.Logger.Warn("failed to invalidate item list cache",
-			zap.String("userID", userID),
-			zap.Error(err),
-		)
-	}
-}
-
-func (s *ItemService) invalidateItemCache(ctx context.Context, itemID string) {
-	if err := s.cache.Del(ctx, itemKey(itemID)); err != nil {
-		logger.Logger.Warn("failed to delete item cache",
-			zap.String("itemID", itemID),
-			zap.Error(err),
-		)
-	}
 }
