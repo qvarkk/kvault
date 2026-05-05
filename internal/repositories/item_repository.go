@@ -236,3 +236,18 @@ func (r *ItemRepo) UnbindTagByItemIDTx(
 	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }
+
+func (r *ItemRepo) FindIDsByTagID(ctx context.Context, tagID string) ([]string, error) {
+	sql, args, err := r.queryBuilder.
+		Select("item_id").
+		From("item_tags").
+		Where(sq.Eq{"tag_id": tagID}).
+		ToSql()
+	if err != nil {
+		return []string{}, toRepositoryError(err)
+	}
+
+	var itemIDs []string
+	err = r.db.SelectContext(ctx, &itemIDs, sql, args...)
+	return itemIDs, toRepositoryError(err)
+}

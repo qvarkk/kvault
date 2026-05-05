@@ -104,7 +104,7 @@ func main() {
 		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, cacheConfig.ItemsTtl)
 		fileService     = services.NewFileService(fileRepo, transactor, enqueuer, aws, cacheStore, cacheConfig.FilesTtl)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor, cacheStore, cacheConfig.StopwordsTtl)
-		tagService      = services.NewTagService(tagRepo, stopwordRepo, transactor)
+		tagService      = services.NewTagService(tagRepo, stopwordRepo, itemRepo, transactor, cacheStore, cacheConfig.TagsTtl)
 	)
 
 	hs := &routes.HandlerServices{

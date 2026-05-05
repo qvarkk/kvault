@@ -21,6 +21,7 @@ type ItemRepo interface {
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 	UnbindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
+	FindIDsByTagID(context.Context, string) ([]string, error)
 }
 
 type ItemService struct {
@@ -43,11 +44,6 @@ type UpdateItemInput struct {
 	UserID  string
 	Title   *string
 	Content *string
-}
-
-type cachedItemList struct {
-	Items []domain.Item
-	Count int
 }
 
 func NewItemService(
