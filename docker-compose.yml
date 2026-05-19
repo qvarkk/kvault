@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/qvarkk/kvault-frontend:latest
+    image: ${REGISTRY}/kvault-frontend:latest
     ports:
       - "80:80"
     depends_on:
@@ -9,7 +9,7 @@ services:
     container_name: kvault_frontend
 
   api:
-    image: ghcr.io/qvarkk/kvault:latest
+    image: ${REGISTRY}/kvault:latest
     env_file: .env
     depends_on:
       pg:
@@ -20,7 +20,7 @@ services:
     container_name: kvault_api
 
   worker:
-    image: ghcr.io/qvarkk/kvault:latest
+    image: ${REGISTRY}/kvault:latest
     command: ["./worker"]
     env_file: .env
     depends_on:
@@ -34,7 +34,7 @@ services:
     container_name: kvault_worker
 
   migrate:
-    image: ghcr.io/qvarkk/kvault:latest
+    image: ${REGISTRY}/kvault:latest
     command: ["./migrate", "up"]
     env_file: .env
     depends_on:
@@ -44,7 +44,7 @@ services:
     container_name: kvault_migrate
 
   redis:
-    image: ghcr.io/qvarkk/kvault-redis:latest
+    image: ${REGISTRY}/kvault-redis:latest
     restart: unless-stopped
     volumes:
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
