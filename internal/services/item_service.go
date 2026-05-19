@@ -25,6 +25,7 @@ type ItemRepo interface {
 	Autotag(ctx context.Context, itemID, userID string, count int) error
 	ListDeleted(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
+	PermanentlyDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 }
 
 type ItemService struct {
@@ -352,6 +353,14 @@ func (s *ItemService) PermanentlyDeleteAllDeleted(ctx context.Context, userID st
 	}
 	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
 	return nil
+}
+
+func (s *ItemService) PermanentlyDeleteByID(ctx context.Context, itemID, userID string) error {
+	return s.authorizeAndMutateTx(
+		ctx, itemID, userID,
+		s.itemRepo.GetDeletedByIDForUpdate,
+		s.itemRepo.PermanentlyDeleteByIDTx,
+	)
 }
 
 func itemKey(itemID string) string {

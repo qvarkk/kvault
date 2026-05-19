@@ -23,6 +23,7 @@ type ItemHandler interface {
 	Update(*gin.Context) error
 	Delete(*gin.Context) error
 	Restore(*gin.Context) error
+	PermanentlyDelete(*gin.Context) error
 	ClearTrash(*gin.Context) error
 	BindTag(*gin.Context) error
 	UnbindTag(*gin.Context) error
@@ -37,6 +38,7 @@ type FileHandler interface {
 	GetViewURL(*gin.Context) error
 	Delete(*gin.Context) error
 	Restore(*gin.Context) error
+	PermanentlyDelete(*gin.Context) error
 	ClearTrash(*gin.Context) error
 }
 

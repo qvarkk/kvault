@@ -16,6 +16,7 @@ type ItemService interface {
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
+	PermanentlyDeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
 	RestoreByID(ctx context.Context, itemID, userID string) error
 	BindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
@@ -433,6 +434,21 @@ func (h *ItemHandler) ListDeleted(ctx *gin.Context) error {
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(itemResponses, total, params.Page, params.PageSize))
 	return nil
+}
+
+// @Summary      Permanently delete a single item from trash
+// @Description  Permanently deletes a single soft-deleted item owned by the user
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Param        id path string true "Item ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/deleted/{id} [delete]
+func (h *ItemHandler) PermanentlyDelete(ctx *gin.Context) error {
+	return h.withOwnedItemAction(ctx, h.itemService.PermanentlyDeleteByID)
 }
 
 // @Summary      Clear item trash

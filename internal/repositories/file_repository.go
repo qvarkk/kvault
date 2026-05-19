@@ -296,6 +296,20 @@ func (r *FileRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 	return toRepositoryError(err)
 }
 
+func (r *FileRepo) PermanentlyDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("files").
+		Where(sq.Eq{"id": fileID}).
+		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
 func (r *FileRepo) GetAllByUserID(ctx context.Context, userID string) ([]domain.File, error) {
 	sql, args, err := r.queryBuilder.
 		Select("*").From("files").

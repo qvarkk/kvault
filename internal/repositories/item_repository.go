@@ -338,6 +338,20 @@ func (r *ItemRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 	return toRepositoryError(err)
 }
 
+func (r *ItemRepo) PermanentlyDeleteByIDTx(ctx context.Context, tx *sqlx.Tx, itemID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("items").
+		Where(sq.Eq{"id": itemID}).
+		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
 func buildTsQuery(input string) string {
 	tokens := strings.Fields(input)
 	parts := make([]string, 0, len(tokens))

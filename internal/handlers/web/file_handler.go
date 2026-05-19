@@ -18,6 +18,7 @@ type FileService interface {
 	DeleteByID(ctx context.Context, fileID, userID string) error
 	RestoreByID(ctx context.Context, fileID, userID string) error
 	ClearTrash(ctx context.Context, userID string) error
+	PermanentlyDeleteByID(ctx context.Context, fileID, userID string) error
 	DeleteAllByUserID(ctx context.Context, userID string) error
 }
 
@@ -280,6 +281,21 @@ func (h *FileHandler) ListDeleted(ctx *gin.Context) error {
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(fileResponses, total, params.Page, params.PageSize))
 	return nil
+}
+
+// @Summary      Permanently delete a single file from trash
+// @Description  Permanently deletes a single soft-deleted file owned by the user and removes it from S3
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Param        id path string true "File ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/deleted/{id} [delete]
+func (h *FileHandler) PermanentlyDelete(ctx *gin.Context) error {
+	return h.withOwnedFileAction(ctx, h.fileService.PermanentlyDeleteByID)
 }
 
 // @Summary      Clear file trash

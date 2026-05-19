@@ -26,6 +26,7 @@ type FileRepo interface {
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
+	PermanentlyDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 }
 
 type FileService struct {
@@ -294,6 +295,27 @@ func (s *FileService) ClearTrash(ctx context.Context, userID string) error {
 		return NewServiceError(ErrInternal, "permanently delete files error", err)
 	}
 
+	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
+	return nil
+}
+
+func (s *FileService) PermanentlyDeleteByID(ctx context.Context, fileID, userID string) error {
+	var s3Key string
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		file, err := s.fileRepo.GetDeletedByIDForUpdate(ctx, tx, fileID)
+		if err != nil {
+			return NewServiceError(ErrFileNotFound, "not found", err)
+		}
+		if file.UserID != userID {
+			return NewServiceError(ErrFileNotFound, "forbidden", nil)
+		}
+		s3Key = file.S3Key
+		return s.fileRepo.PermanentlyDeleteByIDTx(ctx, tx, fileID)
+	})
+	if err != nil {
+		return err
+	}
+	_ = s.storage.Delete(ctx, s3Key)
 	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
 	return nil
 }
