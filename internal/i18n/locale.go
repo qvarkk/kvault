@@ -1,6 +1,8 @@
 package i18n
 
-import "strings"
+import (
+	"strings"
+)
 
 const (
 	LocaleEN = "en"

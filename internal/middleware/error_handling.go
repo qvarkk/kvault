@@ -34,6 +34,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 		case errors.As(err, &validationErr):
 			publicErr = &httpx.PublicError{
 				Err:              httpx.ErrUnprocessableEntity,
+				Key:              "err.unprocessable",
 				ValidationErrors: validationErr,
 			}
 		default:
