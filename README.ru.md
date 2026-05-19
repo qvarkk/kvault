@@ -18,7 +18,6 @@ Self-hosted система управления знаниями. Хранени
 ### Требования
 
 - Docker + Docker Compose
-- Сервер с открытыми портами 80 (или другим) и 3900
 
 ### Быстрый старт
 
@@ -28,9 +27,10 @@ curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example
 mv .env.example .env
 
-# 2. Скачать конфиг Redis (обязательно)
-mkdir -p docker/redis
+# 2. Скачать необходимые конфиги
+mkdir -p docker/redis docker/garage
 curl -o docker/redis/redis.conf https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
+curl -o docker/garage/garage.toml https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
 
 # 3. Отредактировать .env — заполнить перед запуском:
 #    DB_PASSWORD, REDIS_PASSWORD, AWS_PUBLIC_ENDPOINT_URL, API_CORS_ORIGINS
@@ -51,16 +51,16 @@ docker compose up -d
 | Переменная                                    | Описание                                                                                                 |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `REGISTRY`                                    | Реестр образов: `ghcr.io/qvarkk` (GitHub) или `registry.gitlab.com/qvarkk` (GitLab, стабильнее в России) |
-| `API_CORS_ORIGINS`                            | Публичный URL фронтенда, например `http://myserver.com`                                                  |
-| `AWS_PUBLIC_ENDPOINT_URL`                     | Публичный URL Garage S3, например `http://myserver.com:3900` — встраивается в ссылки на файлы            |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials для Garage S3 — генерируются после первого запуска (см. ниже)                                |
+| `API_CORS_ORIGINS`                            | Публичный URL фронтенда, например `http://myserver.com`. При локальном деплое можно оставить по умолчанию |
+| `AWS_PUBLIC_ENDPOINT_URL`                     | Публичный URL S3-хранилища, например `http://myserver.com:3900` — встраивается в ссылки на файлы. При локальном деплое можно оставить по умолчанию |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials S3-хранилища — для Garage генерируются после первого запуска (см. ниже)                      |
 | `DB_PASSWORD`                                 | Пароль PostgreSQL — используйте надёжный                                                                 |
 | `REDIS_PASSWORD`                              | Пароль Redis — используйте надёжный                                                                      |
 | `FRONTEND_PORT`                               | Порт фронтенда на хосте, по умолчанию `80`. Измените при использовании реверс-прокси.                   |
 | `GARAGE_S3_PORT`                              | Порт Garage S3 API на хосте, по умолчанию `3900`. Должен совпадать с портом в `AWS_PUBLIC_ENDPOINT_URL`. |
 | `DEBUG`                                       | Установите `false` в продакшене                                                                          |
 
-### Запуск вместе с другими приложениями (реверс-прокси)
+### Запуск за реверс-прокси
 
 Установите `FRONTEND_PORT` на свободный порт, затем настройте реверс-прокси:
 
@@ -94,9 +94,11 @@ Garage — S3-совместимое хранилище. При первом з�
 alias garage="docker exec kvault_garage /garage"
 
 # Получить ID узла
-garage node id
+garage status
 
 # Создать layout (заменить <node-id> на вывод выше)
+# Флаг -c задаёт ёмкость узла
+# Подробнее: https://garagehq.deuxfleurs.fr/documentation/quick-start/#creating-a-cluster-layout
 garage layout assign -z dc1 -c 1G <node-id>
 garage layout apply --version 1
 
@@ -106,10 +108,7 @@ garage key create kvault-key
 
 # Создать бакет
 garage bucket create kvault-bucket
-garage bucket allow --read --write kvault-bucket --key kvault-key
-
-# Применить CORS-политику Garage (нужно для просмотра файлов в браузере)
-garage bucket website --allow kvault-bucket
+garage bucket allow --read --write --owner kvault-bucket --key kvault-key
 ```
 
 После обновления `.env` — перезапустить:
@@ -117,6 +116,20 @@ garage bucket website --allow kvault-bucket
 ```bash
 docker compose up -d
 ```
+
+Затем применить CORS-политику — нужна для просмотра файлов в браузере. Укажите ключи и URL из `AWS_PUBLIC_ENDPOINT_URL` (по умолчанию `http://localhost:3900`):
+
+```bash
+docker run --rm --network host \
+  -e AWS_ACCESS_KEY_ID=<ваш-access-key-id> \
+  -e AWS_SECRET_ACCESS_KEY=<ваш-secret-key> \
+  amazon/aws-cli s3api put-bucket-cors \
+    --endpoint-url <aws-public-endpoint-url> \
+    --bucket kvault-bucket \
+    --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET"],"AllowedHeaders":["*"]}]}'
+```
+
+Перезапуск после этого не нужен.
 
 ## Разработка
 
@@ -127,7 +140,7 @@ cp .env.example .env
 # Запустить инфраструктуру
 make docker-up
 
-# Запустить API и воркер
+# Подключиться к API и воркеру
 make run-api
 make run-worker
 
@@ -137,4 +150,4 @@ make migrate-up
 
 ## Стек
 
-Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · Vue 3 · Vite
+Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · Vue 3 · Vite · shadcn
