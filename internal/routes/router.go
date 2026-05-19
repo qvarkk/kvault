@@ -26,10 +26,10 @@ type MiddlewareServices struct {
 	User middleware.UserService
 }
 
-func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
+func SetupRouter(hs *HandlerServices, ms *MiddlewareServices, corsOrigins []string) *gin.Engine {
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length"},

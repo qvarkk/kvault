@@ -19,7 +19,8 @@ type Config struct {
 }
 
 type ApiConfig struct {
-	Port int `default:"8080"`
+	Port        int      `default:"8080"`
+	CorsOrigins []string `default:"http://localhost:5173" envconfig:"CORS_ORIGINS"`
 }
 
 type DBConfig struct {

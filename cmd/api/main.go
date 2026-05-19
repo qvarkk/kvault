@@ -121,6 +121,6 @@ func main() {
 		User: userService,
 	}
 
-	r := routes.SetupRouter(hs, ms)
+	r := routes.SetupRouter(hs, ms, config.Api.CorsOrigins)
 	r.Run(fmt.Sprintf(":%d", config.Api.Port))
 }
