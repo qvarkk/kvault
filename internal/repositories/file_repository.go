@@ -212,6 +212,104 @@ func (r *FileRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string
 	return toRepositoryError(err)
 }
 
+func (r *FileRepo) ListDeleted(ctx context.Context, params domain.ListFileFilter) ([]domain.File, int, error) {
+	var files []domain.File
+	var count int
+
+	offset := uint64(params.PageSize * (params.Page - 1))
+	baseQuery := r.queryBuilder.
+		Select().
+		From("files").
+		Where(sq.Eq{"user_id": params.UserID}).
+		Where(sq.NotEq{"deleted_at": nil})
+
+	countQuery := baseQuery.Columns("COUNT(*)")
+	filesQuery := baseQuery.Columns("*").
+		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		Offset(offset).
+		Limit(uint64(params.PageSize))
+
+	filesQuerySql, filesArgs, err := filesQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	countQuerySql, countArgs, err := countQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	g, _ := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		if err := r.db.SelectContext(ctx, &files, filesQuerySql, filesArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	_ = g.Wait()
+
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, 0, toRepositoryError(cause)
+	}
+
+	return files, count, nil
+}
+
+func (r *FileRepo) GetAllDeleted(ctx context.Context, userID string) ([]domain.File, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").From("files").
+		Where(sq.Eq{"user_id": userID}).
+		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var files []domain.File
+	err = r.db.SelectContext(ctx, &files, sql, args...)
+	return files, toRepositoryError(err)
+}
+
+func (r *FileRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("files").
+		Where(sq.Eq{"user_id": userID}).
+		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *FileRepo) GetAllByUserID(ctx context.Context, userID string) ([]domain.File, error) {
+	sql, args, err := r.queryBuilder.
+		Select("*").From("files").
+		Where(sq.Eq{"user_id": userID}).
+		ToSql()
+	if err != nil {
+		return nil, toRepositoryError(err)
+	}
+
+	var files []domain.File
+	err = r.db.SelectContext(ctx, &files, sql, args...)
+	return files, toRepositoryError(err)
+}
+
 func buildFileTsQuery(input string) string {
 	tokens := strings.Fields(input)
 	parts := make([]string, 0, len(tokens))

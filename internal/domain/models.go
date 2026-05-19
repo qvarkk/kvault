@@ -79,6 +79,7 @@ type Tag struct {
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
 	Source    TagSource `db:"source"`
+	ItemCount int       `db:"item_count"`
 }
 
 type Stopword struct {

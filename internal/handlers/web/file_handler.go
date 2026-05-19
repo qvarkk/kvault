@@ -12,9 +12,13 @@ import (
 type FileService interface {
 	Upload(context.Context, string, *multipart.FileHeader) (*domain.File, error)
 	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	ListDeleted(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
+	GetFilePresignedViewUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
 	RestoreByID(ctx context.Context, fileID, userID string) error
+	ClearTrash(ctx context.Context, userID string) error
+	DeleteAllByUserID(ctx context.Context, userID string) error
 }
 
 type FileHandler struct {
@@ -199,6 +203,97 @@ func (h *FileHandler) withOwnedFileAction(
 
 	err := fn(ctx.Request.Context(), uri.ID, userID)
 	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Get inline view URL for a file
+// @Description  Returns a long-lived presigned URL with inline content disposition for browser viewing
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Produce      json
+// @Param        id path string true "File ID"
+// @Success      200   {object}  AwsUrlResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/{id}/view [get]
+func (h *FileHandler) GetViewURL(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri fileIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	url, err := h.fileService.GetFilePresignedViewUrl(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.JSON(http.StatusOK, toAwsUrlResponse(url))
+	return nil
+}
+
+// @Summary      List deleted files
+// @Description  Returns soft-deleted files owned by the user
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Produce      json
+// @Param        params query listFileRequest false "Query parameters"
+// @Success      200   {object}  PaginatedResponse[FileResponse]
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/deleted [get]
+func (h *FileHandler) ListDeleted(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var req listFileRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		return err
+	}
+
+	params := domain.ListFileFilter{
+		UserID: userID,
+		PaginationFilter: domain.PaginationFilter{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: req.Direction,
+			Column:    req.Column,
+		},
+	}
+
+	files, total, err := h.fileService.ListDeleted(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	fileResponses := make([]FileResponse, len(files))
+	for i, file := range files {
+		fileResponses[i] = toFileResponse(&file)
+	}
+
+	ctx.JSON(http.StatusOK, toPaginatedResponse(fileResponses, total, params.Page, params.PageSize))
+	return nil
+}
+
+// @Summary      Clear file trash
+// @Description  Permanently deletes all soft-deleted files owned by the user and removes them from S3
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/deleted [delete]
+func (h *FileHandler) ClearTrash(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	if err := h.fileService.ClearTrash(ctx.Request.Context(), userID); err != nil {
 		return err
 	}
 

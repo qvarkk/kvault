@@ -17,6 +17,7 @@ type FileStorage interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	GeneratePresignUrl(ctx context.Context, key, filename string) (url string, expiresAt time.Time, err error)
+	GeneratePresignViewUrl(ctx context.Context, key string) (url string, expiresAt time.Time, err error)
 }
 
 type TaskEnqueuer interface {

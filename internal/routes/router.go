@@ -31,7 +31,7 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
@@ -42,7 +42,7 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices) *gin.Engine {
 	api := r.Group("/api/v1")
 	auth := middleware.AuthRequired(ms.User)
 
-	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser))
+	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser, hs.File))
 	registerUserRoutes(api, auth, web.NewUserHandler(hs.User))
 	registerItemRoutes(api, auth, web.NewItemHandler(hs.Item))
 	registerFileRoutes(api, auth, web.NewFileHandler(hs.File))
@@ -60,6 +60,8 @@ func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandle
 	protected := group.Group("/", auth)
 	protected.GET("/me", web.APIWrap(h.GetAuthenticatedUser))
 	protected.POST("/refresh", web.APIWrap(h.RotateApiKey))
+	protected.PATCH("/me/password", web.APIWrap(h.ChangePassword))
+	protected.POST("/me/delete", web.APIWrap(h.DeleteAccount))
 }
 
 func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h UserHandler) {
@@ -72,10 +74,13 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandle
 	group := api.Group("/items", auth)
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
+	group.GET("/deleted", web.APIWrap(h.ListDeleted))
+	group.DELETE("/deleted", web.APIWrap(h.ClearTrash))
 	group.GET("/:id", web.APIWrap(h.Get))
 	group.PATCH("/:id", web.APIWrap(h.Update))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
+	group.POST("/:id/autotag", web.APIWrap(h.Autotag))
 
 	group.POST("/:id/tags", web.APIWrap(h.BindTag))
 	group.DELETE("/:id/tags/:tag_id", web.APIWrap(h.UnbindTag))
@@ -85,7 +90,10 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandle
 	group := api.Group("/files", auth)
 	group.POST("/upload", web.APIWrap(h.UploadFile))
 	group.GET("", web.APIWrap(h.List))
+	group.GET("/deleted", web.APIWrap(h.ListDeleted))
+	group.DELETE("/deleted", web.APIWrap(h.ClearTrash))
 	group.GET("/:id", web.APIWrap(h.Download))
+	group.GET("/:id/view", web.APIWrap(h.GetViewURL))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }

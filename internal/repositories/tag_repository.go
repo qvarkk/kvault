@@ -49,16 +49,19 @@ func (r *TagRepo) List(
 	offset := uint64(params.PageSize * (params.Page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
-		From("tags").
-		Where(sq.Eq{"user_id": params.UserID})
+		From("tags t").
+		LeftJoin("item_tags it ON it.tag_id = t.id").
+		LeftJoin("items i ON i.id = it.item_id AND i.deleted_at IS NULL").
+		Where(sq.Eq{"t.user_id": params.UserID})
 
 	if params.Query != "" {
-		baseQuery = baseQuery.Where("name LIKE ?", "%"+params.Query+"%")
+		baseQuery = baseQuery.Where("t.name LIKE ?", "%"+params.Query+"%")
 	}
 
 	tagsSql, tagsArgs, err := baseQuery.
-		Columns("*").
-		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		Columns("t.*", "COUNT(it.item_id) AS item_count").
+		GroupBy("t.id").
+		OrderBy(fmt.Sprintf("t.%s %s", params.Column, params.Direction)).
 		Offset(offset).
 		Limit(uint64(params.PageSize)).
 		ToSql()
@@ -66,7 +69,7 @@ func (r *TagRepo) List(
 		return nil, 0, toRepositoryError(err)
 	}
 
-	countSql, countArgs, err := baseQuery.Columns("COUNT(*)").ToSql()
+	countSql, countArgs, err := baseQuery.Columns("COUNT(DISTINCT t.id)").ToSql()
 	if err != nil {
 		return nil, 0, toRepositoryError(err)
 	}
@@ -95,7 +98,7 @@ func (r *TagRepo) List(
 	_ = g.Wait()
 
 	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(err)
+		return nil, 0, toRepositoryError(cause)
 	}
 
 	return tags, count, nil

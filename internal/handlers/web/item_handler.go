@@ -12,12 +12,15 @@ import (
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
 	List(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
+	ListDeleted(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
+	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
 	RestoreByID(ctx context.Context, itemID, userID string) error
 	BindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
 	UnbindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
+	Autotag(ctx context.Context, itemID, userID string, count int) ([]domain.Tag, error)
 }
 
 type ItemHandler struct {
@@ -55,6 +58,10 @@ type updateItemRequest struct {
 
 type bindTagRequest struct {
 	TagID string `json:"tag_id" binding:"required,uuid"`
+}
+
+type autotagRequest struct {
+	Number int `json:"number" binding:"required,min=1,max=10"`
 }
 
 type unbindTagUri struct {
@@ -336,6 +343,110 @@ func (h *ItemHandler) UnbindTag(ctx *gin.Context) error {
 
 	err := h.itemService.UnbindTagByItemID(ctx.Request.Context(), uri.ItemID, uri.TagID, userID)
 	if err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Autotag an item
+// @Description  Generates and binds up to N tags based on item content
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path   string         true  "Item ID"
+// @Param        body  body   autotagRequest true  "Number of tags to generate (1-10)"
+// @Success      200   {object}  ListResponse[TagRef]
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id}/autotag [post]
+func (h *ItemHandler) Autotag(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	var req autotagRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		return err
+	}
+
+	tags, err := h.itemService.Autotag(ctx.Request.Context(), uri.ID, userID, req.Number)
+	if err != nil {
+		return err
+	}
+
+	tagRefs := make([]TagRef, len(tags))
+	for i := range tags {
+		tagRefs[i] = toTagRef(&tags[i])
+	}
+	ctx.JSON(http.StatusOK, ListResponse[TagRef]{Data: tagRefs})
+	return nil
+}
+
+// @Summary      List deleted items
+// @Description  Returns soft-deleted items owned by the user
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        params query listItemQuery false "Query parameters"
+// @Success      200   {object}  PaginatedResponse[ItemResponse]
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/deleted [get]
+func (h *ItemHandler) ListDeleted(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var query listItemQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		return err
+	}
+
+	params := domain.ListItemFilter{
+		UserID: userID,
+		PaginationFilter: domain.PaginationFilter{
+			Page:     query.Page,
+			PageSize: query.PageSize,
+		},
+		SortFilter: domain.SortFilter{
+			Direction: query.Direction,
+			Column:    query.Column,
+		},
+	}
+
+	items, total, err := h.itemService.ListDeleted(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	itemResponses := make([]ItemResponse, len(items))
+	for i, item := range items {
+		itemResponses[i] = toItemResponse(&item)
+	}
+
+	ctx.JSON(http.StatusOK, toPaginatedResponse(itemResponses, total, params.Page, params.PageSize))
+	return nil
+}
+
+// @Summary      Clear item trash
+// @Description  Permanently deletes all soft-deleted items owned by the user
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/deleted [delete]
+func (h *ItemHandler) ClearTrash(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	if err := h.itemService.PermanentlyDeleteAllDeleted(ctx.Request.Context(), userID); err != nil {
 		return err
 	}
 

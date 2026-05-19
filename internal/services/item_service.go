@@ -22,6 +22,9 @@ type ItemRepo interface {
 	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 	UnbindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 	FindIDsByTagID(context.Context, string) ([]string, error)
+	Autotag(ctx context.Context, itemID, userID string, count int) error
+	ListDeleted(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
+	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
 }
 
 type ItemService struct {
@@ -287,6 +290,67 @@ func (s *ItemService) authorizeAndBindTagTx(
 	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
 	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
 
+	return nil
+}
+
+func (s *ItemService) Autotag(ctx context.Context, itemID, userID string, count int) ([]domain.Tag, error) {
+	item, err := s.itemRepo.GetByID(ctx, itemID)
+	if err != nil {
+		return nil, NewServiceError(ErrItemNotFound, "not found", err)
+	}
+	if item.UserID != userID {
+		return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
+	}
+
+	totalChars := len(item.Title) + len(item.Content.String)
+	requiredChars := 5 * 10 * count
+	if totalChars < requiredChars {
+		return nil, NewServiceError(ErrInsufficientContent, "not enough content", nil)
+	}
+
+	if err := s.itemRepo.Autotag(ctx, itemID, userID, count); err != nil {
+		return nil, NewServiceError(ErrInternal, "autotag error", err)
+	}
+
+	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
+
+	tags, err := s.tagRepo.FindByItemID(ctx, itemID)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "get item tags error", err)
+	}
+
+	return tags, nil
+}
+
+func (s *ItemService) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+	items, count, err := s.itemRepo.ListDeleted(ctx, f)
+	if err != nil {
+		return nil, 0, NewServiceError(ErrInternal, "list deleted items error", err)
+	}
+
+	if len(items) > 0 {
+		ids := make([]string, len(items))
+		for i, item := range items {
+			ids[i] = item.ID
+		}
+		tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
+		if err != nil {
+			return nil, 0, NewServiceError(ErrInternal, "get item tags error", err)
+		}
+		for i := range items {
+			items[i].Tags = tagsByItem[items[i].ID]
+		}
+	}
+
+	return items, count, nil
+}
+
+func (s *ItemService) PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error {
+	if err := s.itemRepo.PermanentlyDeleteAllDeleted(ctx, userID); err != nil {
+		return NewServiceError(ErrInternal, "permanently delete error", err)
+	}
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
 	return nil
 }
 

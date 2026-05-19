@@ -264,6 +264,80 @@ func (r *ItemRepo) FindIDsByTagID(ctx context.Context, tagID string) ([]string, 
 	return itemIDs, toRepositoryError(err)
 }
 
+func (r *ItemRepo) Autotag(ctx context.Context, itemID, userID string, count int) error {
+	_, err := r.db.ExecContext(ctx, "SELECT extract_item_tags($1, $2, $3)", itemID, userID, count)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+	var items []domain.Item
+	var count int
+
+	offset := uint64(f.PageSize * (f.Page - 1))
+	baseQuery := r.queryBuilder.
+		Select().
+		From("items i").
+		Where(sq.Eq{"i.user_id": f.UserID}).
+		Where(sq.NotEq{"i.deleted_at": nil})
+
+	countQuery := baseQuery.Columns("COUNT(*)")
+	itemsQuery := baseQuery.Columns("i.*").
+		OrderBy(fmt.Sprintf("i.%s %s", f.Column, f.Direction)).
+		Offset(offset).
+		Limit(uint64(f.PageSize))
+
+	itemsQuerySql, itemsArgs, err := itemsQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	countQuerySql, countArgs, err := countQuery.ToSql()
+	if err != nil {
+		return nil, 0, toRepositoryError(err)
+	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	g, _ := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		if err := r.db.SelectContext(ctx, &items, itemsQuerySql, itemsArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
+			cancel(err)
+			return err
+		}
+		return nil
+	})
+
+	_ = g.Wait()
+
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, 0, toRepositoryError(cause)
+	}
+
+	return items, count, nil
+}
+
+func (r *ItemRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("items").
+		Where(sq.Eq{"user_id": userID}).
+		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
 func buildTsQuery(input string) string {
 	tokens := strings.Fields(input)
 	parts := make([]string, 0, len(tokens))

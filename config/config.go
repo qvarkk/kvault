@@ -48,13 +48,14 @@ type CacheConfig struct {
 }
 
 type AwsConfig struct {
-	AccessKeyID     string        `required:"true" envconfig:"ACCESS_KEY_ID"`
-	SecretAccessKey string        `required:"true" envconfig:"SECRET_ACCESS_KEY"`
-	Region          string        `required:"true" envconfig:"REGION"`
-	EndpointUrl     string        `required:"true" envconfig:"ENDPOINT_URL"`
-	S3Bucket        string        `required:"true" envconfig:"S3_BUCKET"`
-	UrlExpiration   time.Duration `default:"60s"   envconfig:"URL_EXPIRATION"`
-	PublicEndpointUrl string      `envconfig:"PUBLIC_ENDPOINT_URL"`
+	AccessKeyID       string        `required:"true" envconfig:"ACCESS_KEY_ID"`
+	SecretAccessKey   string        `required:"true" envconfig:"SECRET_ACCESS_KEY"`
+	Region            string        `required:"true" envconfig:"REGION"`
+	EndpointUrl       string        `required:"true" envconfig:"ENDPOINT_URL"`
+	S3Bucket          string        `required:"true" envconfig:"S3_BUCKET"`
+	UrlExpiration     time.Duration `default:"60s"  envconfig:"URL_EXPIRATION"`
+	ViewUrlExpiration time.Duration `default:"24h"  envconfig:"VIEW_URL_EXPIRATION"`
+	PublicEndpointUrl string        `envconfig:"PUBLIC_ENDPOINT_URL"`
 }
 
 type WorkerConfig struct {

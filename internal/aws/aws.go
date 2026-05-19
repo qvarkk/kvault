@@ -23,6 +23,7 @@ type AwsStorage struct {
 	bucketName        string
 	prefix            string
 	urlExpiration     time.Duration
+	viewUrlExpiration time.Duration
 	publicEndpointUrl string
 }
 
@@ -42,6 +43,7 @@ func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
 		bucketName:        config.S3Bucket,
 		prefix:            uploadsPrefix,
 		urlExpiration:     config.UrlExpiration,
+		viewUrlExpiration: config.ViewUrlExpiration,
 		publicEndpointUrl: config.PublicEndpointUrl,
 	}, nil
 }
@@ -110,6 +112,35 @@ func (s *AwsStorage) GeneratePresignUrl(
 	}
 
 	return resultURL, time.Now().UTC().Add(s.urlExpiration), nil
+}
+
+func (s *AwsStorage) GeneratePresignViewUrl(
+	ctx context.Context,
+	key string,
+) (string, time.Time, error) {
+	presignedResult, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     awslib.String(s.bucketName),
+		Key:                        awslib.String(s.fullKey(key)),
+		ResponseContentDisposition: awslib.String("inline"),
+	}, s3.WithPresignExpires(s.viewUrlExpiration))
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	resultURL := presignedResult.URL
+	if s.publicEndpointUrl != "" {
+		parsed, err := url.Parse(presignedResult.URL)
+		if err == nil {
+			pub, err := url.Parse(s.publicEndpointUrl)
+			if err == nil {
+				parsed.Scheme = pub.Scheme
+				parsed.Host = pub.Host
+				resultURL = parsed.String()
+			}
+		}
+	}
+
+	return resultURL, time.Now().UTC().Add(s.viewUrlExpiration), nil
 }
 
 func (s *AwsStorage) fullKey(key string) string {

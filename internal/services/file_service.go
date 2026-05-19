@@ -17,11 +17,15 @@ import (
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
 	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	ListDeleted(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	GetAllDeleted(ctx context.Context, userID string) ([]domain.File, error)
+	GetAllByUserID(ctx context.Context, userID string) ([]domain.File, error)
 	GetByID(context.Context, string) (*domain.File, error)
 	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.File, error)
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
+	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
 }
 
 type FileService struct {
@@ -237,6 +241,72 @@ func (s *FileService) authorizeAndMutateTx(
 	}
 
 	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
+
+	return nil
+}
+
+func (s *FileService) GetFilePresignedViewUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error) {
+	file, err := s.fileRepo.GetByID(ctx, fileID)
+	if err != nil {
+		return nil, NewServiceError(ErrFileNotFound, "not found", err)
+	}
+
+	if file.UserID != userID {
+		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
+	}
+
+	url, expiresAt, err := s.storage.GeneratePresignViewUrl(ctx, file.S3Key)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "generate presign view url error", err)
+	}
+
+	return &domain.PresignedURL{
+		URL:       url,
+		Filename:  file.OriginalName,
+		MimeType:  file.MimeType,
+		Size:      file.Size,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+func (s *FileService) ListDeleted(ctx context.Context, f domain.ListFileFilter) ([]domain.File, int, error) {
+	files, count, err := s.fileRepo.ListDeleted(ctx, f)
+	if err != nil {
+		return nil, 0, NewServiceError(ErrInternal, "list deleted files error", err)
+	}
+	return files, count, nil
+}
+
+func (s *FileService) ClearTrash(ctx context.Context, userID string) error {
+	files, err := s.fileRepo.GetAllDeleted(ctx, userID)
+	if err != nil {
+		return NewServiceError(ErrInternal, "get deleted files error", err)
+	}
+
+	for _, f := range files {
+		if err := s.storage.Delete(ctx, f.S3Key); err != nil {
+			// best effort — log but continue so DB records are cleaned up
+			_ = err
+		}
+	}
+
+	if err := s.fileRepo.PermanentlyDeleteAllDeleted(ctx, userID); err != nil {
+		return NewServiceError(ErrInternal, "permanently delete files error", err)
+	}
+
+	invalidateListCache(ctx, s.cache, fileListVersionKey(userID))
+	return nil
+}
+
+func (s *FileService) DeleteAllByUserID(ctx context.Context, userID string) error {
+	files, err := s.fileRepo.GetAllByUserID(ctx, userID)
+	if err != nil {
+		return NewServiceError(ErrInternal, "get user files error", err)
+	}
+
+	for _, f := range files {
+		_ = s.storage.Delete(ctx, f.S3Key)
+	}
 
 	return nil
 }

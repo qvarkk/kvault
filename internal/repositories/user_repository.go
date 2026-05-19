@@ -87,6 +87,29 @@ func (r *UserRepo) UpdateApiKey(ctx context.Context, userID string, apiKey strin
 	return &user, toRepositoryError(err)
 }
 
+func (r *UserRepo) UpdatePassword(ctx context.Context, userID, passwordHash string) error {
+	sql, args, err := r.queryBuilder.
+		Update("users").Set("password", passwordHash).Set("updated_at", "now()").
+		Where(sq.Eq{"id": userID}).ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *UserRepo) DeleteByID(ctx context.Context, userID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("users").Where(sq.Eq{"id": userID}).ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
 func (r *UserRepo) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
 	sql, args, err := r.queryBuilder.
 		Select("*").From("users").

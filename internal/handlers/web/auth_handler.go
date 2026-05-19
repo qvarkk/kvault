@@ -13,15 +13,32 @@ type AuthService interface {
 	RegisterNewUser(ctx context.Context, email string, password string) (*domain.User, error)
 	VerifyCredentials(ctx context.Context, email string, password string) (*domain.User, error)
 	RotateApiKey(ctx context.Context, userID string) (*domain.User, error)
+	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
+	VerifyPassword(ctx context.Context, userID, password string) error
+	DeleteAccount(ctx context.Context, userID string) error
 }
 
 type AuthUserService interface {
 	GetByID(context.Context, string) (*domain.User, error)
 }
 
+type AuthFileService interface {
+	DeleteAllByUserID(ctx context.Context, userID string) error
+}
+
 type AuthHandler struct {
 	authService AuthService
 	userService AuthUserService
+	fileService AuthFileService
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
+type deleteAccountRequest struct {
+	Password string `json:"password" binding:"required"`
 }
 
 type registerUserRequest struct {
@@ -34,10 +51,11 @@ type authenticateUserRequest struct {
 	Password string `json:"password" binding:"required" example:"#strongPwd?123."`
 }
 
-func NewAuthHandler(authService AuthService, userService AuthUserService) *AuthHandler {
+func NewAuthHandler(authService AuthService, userService AuthUserService, fileService AuthFileService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		userService: userService,
+		fileService: fileService,
 	}
 }
 
@@ -132,5 +150,65 @@ func (h *AuthHandler) RotateApiKey(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	return nil
+}
+
+// @Summary      Change password
+// @Description  Verifies old password and replaces it with new password
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Param        body body changePasswordRequest true "Passwords"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/me/password [patch]
+func (h *AuthHandler) ChangePassword(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var req changePasswordRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		return err
+	}
+
+	if err := h.authService.ChangePassword(ctx.Request.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Delete account
+// @Description  Verifies password and permanently deletes the authenticated user and all their data
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Param        body body deleteAccountRequest true "Password confirmation"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/me/delete [post]
+func (h *AuthHandler) DeleteAccount(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var req deleteAccountRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		return err
+	}
+
+	if err := h.authService.VerifyPassword(ctx.Request.Context(), userID, req.Password); err != nil {
+		return err
+	}
+
+	_ = h.fileService.DeleteAllByUserID(ctx.Request.Context(), userID)
+
+	if err := h.authService.DeleteAccount(ctx.Request.Context(), userID); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
 	return nil
 }

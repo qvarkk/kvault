@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"qvarkk/kvault/internal/i18n"
+
 	"github.com/go-playground/validator/v10"
 )
 
@@ -27,6 +29,7 @@ var errorStatusMap = map[error]int{
 
 type PublicError struct {
 	Err              error
+	Key              string
 	Message          string
 	ValidationErrors validator.ValidationErrors
 }
@@ -56,15 +59,21 @@ func (e *PublicError) GetHttpStatus() int {
 	return http.StatusInternalServerError
 }
 
-func (e *PublicError) ToErrorResponse(instance string) *ErrorResponse {
+func (e *PublicError) ToErrorResponse(instance, locale string) *ErrorResponse {
 	status := e.GetHttpStatus()
 
-	msg := e.Message
+	var msg string
+	if e.Key != "" {
+		msg = i18n.Translate(e.Key, locale)
+	}
+	if msg == "" {
+		msg = e.Message
+	}
 	if msg == "" {
 		msg = e.Error()
 	}
 
-	return NewErrorResponse(status, instance, msg, e.ValidationErrors)
+	return NewErrorResponse(status, instance, msg, e.ValidationErrors, locale)
 }
 
 func NewErrorResponse(
@@ -72,6 +81,7 @@ func NewErrorResponse(
 	instance string,
 	detail string,
 	validation validator.ValidationErrors,
+	locale string,
 ) *ErrorResponse {
 	return &ErrorResponse{
 		Type:       "about:blank",
@@ -79,6 +89,6 @@ func NewErrorResponse(
 		Status:     status,
 		Instance:   instance,
 		Detail:     detail,
-		Validation: DetailValidationErrors(validation),
+		Validation: DetailValidationErrors(validation, locale),
 	}
 }

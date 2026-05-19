@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"qvarkk/kvault/internal/httpx"
+	"qvarkk/kvault/internal/i18n"
 	"qvarkk/kvault/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		locale := i18n.ParseLocale(c.GetHeader("Accept-Language"))
 		err := c.Errors.Last().Err
 
 		var publicErr *httpx.PublicError
@@ -48,7 +50,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 			)
 		}
 
-		errResponse := publicErr.ToErrorResponse(c.FullPath())
+		errResponse := publicErr.ToErrorResponse(c.FullPath(), locale)
 		c.AbortWithStatusJSON(errResponse.Status, errResponse)
 	}
 }

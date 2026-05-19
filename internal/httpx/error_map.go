@@ -15,6 +15,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrUnauthenticated,
 		public: &PublicError{
 			Err:     ErrUnauthorized,
+			Key:     "err.invalid_api_key",
 			Message: "Invalid or missing API key.",
 		},
 	},
@@ -22,6 +23,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrForbidden,
 		public: &PublicError{
 			Err:     ErrForbidden,
+			Key:     "err.access_forbidden",
 			Message: "Access forbidden.",
 		},
 	},
@@ -29,6 +31,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrInvalidCredentials,
 		public: &PublicError{
 			Err:     ErrUnauthorized,
+			Key:     "err.invalid_credentials",
 			Message: "Invalid credentials provided.",
 		},
 	},
@@ -36,6 +39,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrUserNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
+			Key:     "err.user_not_found",
 			Message: "User not found.",
 		},
 	},
@@ -43,6 +47,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrUserAlreadyExists,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
+			Key:     "err.user_already_exists",
 			Message: "User with this email already exists.",
 		},
 	},
@@ -50,6 +55,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrItemNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
+			Key:     "err.item_not_found",
 			Message: "Item with given ID does not exist.",
 		},
 	},
@@ -57,6 +63,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrFileNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
+			Key:     "err.file_not_found",
 			Message: "File with given ID does not exist.",
 		},
 	},
@@ -64,6 +71,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrStopwordNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
+			Key:     "err.stopword_not_found",
 			Message: "This stopword does not exist.",
 		},
 	},
@@ -71,6 +79,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrStopwordAlreadyExists,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
+			Key:     "err.stopword_already_exists",
 			Message: "This stopword already exists.",
 		},
 	},
@@ -78,6 +87,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrTagNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
+			Key:     "err.tag_not_found",
 			Message: "This tag does not exist.",
 		},
 	},
@@ -85,6 +95,7 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrTagAlreadyExists,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
+			Key:     "err.tag_already_exists",
 			Message: "This tag already exists.",
 		},
 	},
@@ -92,7 +103,16 @@ var serviceErrorRules = []mappingRule{
 		target: services.ErrPdfFileFormat,
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
+			Key:     "err.pdf_format",
 			Message: "File should be of a PDF content type.",
+		},
+	},
+	{
+		target: services.ErrInsufficientContent,
+		public: &PublicError{
+			Err:     ErrUnprocessableEntity,
+			Key:     "err.insufficient_content",
+			Message: "Not enough content to generate the requested number of tags.",
 		},
 	},
 }

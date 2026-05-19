@@ -16,6 +16,8 @@ type AuthUserRepo interface {
 	GetByID(context.Context, string) (*domain.User, error)
 	GetByEmail(context.Context, string) (*domain.User, error)
 	UpdateApiKey(ctx context.Context, userID string, apiKey string) (*domain.User, error)
+	UpdatePassword(ctx context.Context, userID, passwordHash string) error
+	DeleteByID(ctx context.Context, userID string) error
 	IsApiKeyUnique(context.Context, string) (bool, error)
 }
 
@@ -116,6 +118,49 @@ func (a *AuthService) RotateApiKey(
 	}
 
 	return user, nil
+}
+
+func (a *AuthService) ChangePassword(
+	ctx context.Context,
+	userID, oldPassword, newPassword string,
+) error {
+	user, err := a.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return NewServiceError(ErrUserNotFound, "not found", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
+		return NewServiceError(ErrInvalidCredentials, "wrong old password", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return NewServiceError(ErrInternal, "failed to hash password", err)
+	}
+
+	if err := a.userRepo.UpdatePassword(ctx, userID, string(hash)); err != nil {
+		return NewServiceError(ErrInternal, "failed to update password", err)
+	}
+
+	return nil
+}
+
+func (a *AuthService) VerifyPassword(ctx context.Context, userID, password string) error {
+	user, err := a.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return NewServiceError(ErrUserNotFound, "not found", err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return NewServiceError(ErrInvalidCredentials, "wrong password", err)
+	}
+	return nil
+}
+
+func (a *AuthService) DeleteAccount(ctx context.Context, userID string) error {
+	if err := a.userRepo.DeleteByID(ctx, userID); err != nil {
+		return NewServiceError(ErrInternal, "failed to delete user", err)
+	}
+	return nil
 }
 
 func GenerateUuidV4() string {

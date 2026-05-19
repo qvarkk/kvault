@@ -17,6 +17,7 @@ type TagResponse struct {
 	UserID    string `json:"user_id"`
 	UpdatedAt string `json:"updated_at"`
 	CreatedAt string `json:"created_at"`
+	ItemCount int    `json:"item_count"`
 }
 
 func toTagResponse(tag *domain.Tag) TagResponse {
@@ -26,6 +27,7 @@ func toTagResponse(tag *domain.Tag) TagResponse {
 		UserID:    tag.UserID,
 		UpdatedAt: tag.UpdatedAt.Format(time.RFC3339),
 		CreatedAt: tag.CreatedAt.Format(time.RFC3339),
+		ItemCount: tag.ItemCount,
 	}
 }
 

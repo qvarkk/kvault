@@ -31,6 +31,8 @@ var (
 	ErrTagAlreadyExists = errors.New("service: tag already exists")
 
 	ErrPdfFileFormat = errors.New("services: provided file has to be a PDF file")
+
+	ErrInsufficientContent = errors.New("service: insufficient content for autotagging")
 )
 
 type ServiceError struct {
