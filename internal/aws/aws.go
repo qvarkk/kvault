@@ -24,7 +24,6 @@ type AwsStorage struct {
 	prefix            string
 	urlExpiration     time.Duration
 	viewUrlExpiration time.Duration
-	publicEndpointUrl string
 }
 
 func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
@@ -37,14 +36,21 @@ func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
 		o.UsePathStyle = true
 	})
 
+	presignBase := client
+	if config.PublicEndpointUrl != "" {
+		presignBase = s3.NewFromConfig(awsConfig, func(o *s3.Options) {
+			o.UsePathStyle = true
+			o.BaseEndpoint = awslib.String(config.PublicEndpointUrl)
+		})
+	}
+
 	return &AwsStorage{
 		s3Client:          client,
-		presignClient:     s3.NewPresignClient(client),
+		presignClient:     s3.NewPresignClient(presignBase),
 		bucketName:        config.S3Bucket,
 		prefix:            uploadsPrefix,
 		urlExpiration:     config.UrlExpiration,
 		viewUrlExpiration: config.ViewUrlExpiration,
-		publicEndpointUrl: config.PublicEndpointUrl,
 	}, nil
 }
 
@@ -98,20 +104,7 @@ func (s *AwsStorage) GeneratePresignUrl(
 		return "", time.Time{}, err
 	}
 
-	resultURL := presignedResult.URL
-	if s.publicEndpointUrl != "" {
-		parsed, err := url.Parse(presignedResult.URL)
-		if err == nil {
-			pub, err := url.Parse(s.publicEndpointUrl)
-			if err == nil {
-				parsed.Scheme = pub.Scheme
-				parsed.Host = pub.Host
-				resultURL = parsed.String()
-			}
-		}
-	}
-
-	return resultURL, time.Now().UTC().Add(s.urlExpiration), nil
+	return presignedResult.URL, time.Now().UTC().Add(s.urlExpiration), nil
 }
 
 func (s *AwsStorage) GeneratePresignViewUrl(
@@ -127,20 +120,7 @@ func (s *AwsStorage) GeneratePresignViewUrl(
 		return "", time.Time{}, err
 	}
 
-	resultURL := presignedResult.URL
-	if s.publicEndpointUrl != "" {
-		parsed, err := url.Parse(presignedResult.URL)
-		if err == nil {
-			pub, err := url.Parse(s.publicEndpointUrl)
-			if err == nil {
-				parsed.Scheme = pub.Scheme
-				parsed.Host = pub.Host
-				resultURL = parsed.String()
-			}
-		}
-	}
-
-	return resultURL, time.Now().UTC().Add(s.viewUrlExpiration), nil
+	return presignedResult.URL, time.Now().UTC().Add(s.viewUrlExpiration), nil
 }
 
 func (s *AwsStorage) fullKey(key string) string {
