@@ -32,9 +32,12 @@ mv .env.example .env
 mkdir -p docker/redis
 curl -o docker/redis/redis.conf https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
 
-# 3. Edit .env — at least set these:
-#    DB_PASSWORD, REDIS_PASSWORD, AWS_ACCESS_KEY_ID,
-#    AWS_SECRET_ACCESS_KEY, AWS_PUBLIC_ENDPOINT_URL, API_CORS_ORIGINS
+# 3. Edit .env — set these before starting:
+#    DB_PASSWORD, REDIS_PASSWORD, AWS_PUBLIC_ENDPOINT_URL, API_CORS_ORIGINS
+#
+#    AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY come from Garage —
+#    start the stack first, generate them (see "Garage setup" below),
+#    then add them to .env and restart.
 
 # 4. Start
 docker compose pull

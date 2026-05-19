@@ -75,9 +75,11 @@ services:
       - "${GARAGE_S3_PORT:-3900}:3900"
     volumes:
       - "./docker/garage/garage.toml:/etc/garage.toml"
-      - "./tmp/garage/meta:/var/lib/garage/meta"
-      - "./tmp/garage/data:/var/lib/garage/data"
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
     container_name: kvault_garage
 
 volumes:
   pg_data:
+  garage_meta:
+  garage_data:
