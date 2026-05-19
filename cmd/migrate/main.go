@@ -35,17 +35,17 @@ func main() {
 
 	pg, err := postgres.NewPostgres(pgConfig)
 	if err != nil {
-		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
+		zap.L().Fatal("Connection to database failed", zap.Error(err))
 	}
 	defer pg.Close()
 
 	migrator, err := migrations.NewMigrator(pg.DB.DB, config.DB.Database)
 	if err != nil {
-		logger.Logger.Fatal("Failed to initialize migration module", zap.Error(err))
+		zap.L().Fatal("Failed to initialize migration module", zap.Error(err))
 	}
 
 	if len(os.Args) < 2 {
-		logger.Logger.Fatal("usage: migrate [up|down|steps N|force V|version]")
+		zap.L().Fatal("usage: migrate [up|down|steps N|force V|version]")
 	}
 
 	switch os.Args[1] {
@@ -61,15 +61,15 @@ func main() {
 		err = migrator.Force(v)
 	case "version":
 		v, dirty, verr := migrator.Version()
-		logger.Logger.Info("version status", zap.Uint("version", v), zap.Bool("dirty", dirty))
+		zap.L().Info("version status", zap.Uint("version", v), zap.Bool("dirty", dirty))
 		err = verr
 	default:
-		logger.Logger.Fatal("unknown command", zap.String("command", os.Args[1]))
+		zap.L().Fatal("unknown command", zap.String("command", os.Args[1]))
 	}
 
 	if err != nil {
-		logger.Logger.Fatal("unknown error", zap.Error(err))
+		zap.L().Fatal("unknown error", zap.Error(err))
 	}
 
-	logger.Logger.Info("command run successfully")
+	zap.L().Info("command run successfully")
 }

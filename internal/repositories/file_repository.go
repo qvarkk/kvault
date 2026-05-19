@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"strings"
+	"unicode"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -48,8 +50,12 @@ func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]do
 		Where(sq.Eq{"user_id": params.UserID}).
 		Where(sq.Eq{"deleted_at": nil})
 
+	var tsQuery string
 	if params.Query != "" {
-		baseQuery = baseQuery.Where("search_vector @@ websearch_to_tsquery('simple', ?)", params.Query)
+		tsQuery = buildFileTsQuery(params.Query)
+		if tsQuery != "" {
+			baseQuery = baseQuery.Where("search_vector @@ to_tsquery('simple', ?)", tsQuery)
+		}
 	}
 
 	if params.MimeType != "" {
@@ -58,8 +64,11 @@ func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]do
 
 	// TODO: unify orderby with handler somehow, sql injection possible
 	// TODO: refactor repetition in ItemsRepo.List
-	filesQuery := baseQuery.
-		Columns("*").
+	filesQuery := baseQuery.Columns("*")
+	if tsQuery != "" {
+		filesQuery = filesQuery.OrderByClause(sq.Expr("ts_rank(search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
+	}
+	filesQuery = filesQuery.
 		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
 		Offset(offset).
 		Limit(uint64(params.PageSize))
@@ -201,4 +210,24 @@ func (r *FileRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string
 
 	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
+}
+
+func buildFileTsQuery(input string) string {
+	tokens := strings.Fields(input)
+	parts := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		var b strings.Builder
+		for _, r := range t {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
+				b.WriteRune(r)
+			}
+		}
+		if s := b.String(); s != "" {
+			parts = append(parts, s+":*")
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " & ")
 }

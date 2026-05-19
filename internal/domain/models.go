@@ -78,6 +78,7 @@ type Tag struct {
 	UserID    string    `db:"user_id"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+	Source    TagSource `db:"source"`
 }
 
 type Stopword struct {

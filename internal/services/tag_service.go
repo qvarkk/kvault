@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repositories"
-	"qvarkk/kvault/logger"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -182,7 +181,7 @@ func (s *TagService) DeleteByID(
 func (s *TagService) invalidateTagAndItemCaches(ctx context.Context, tagID, userID string) {
 	itemIDs, err := s.itemRepo.FindIDsByTagID(ctx, tagID)
 	if err != nil {
-		logger.Logger.Warn(
+		zap.L().Warn(
 			"failed to fetch items for tag cache invalidation",
 			zap.String("user_id", userID),
 			zap.String("tag_id", tagID),

@@ -177,6 +177,12 @@ func (s *ItemService) Update(ctx context.Context, input UpdateItemInput) (*domai
 	invalidateSingleCache(ctx, s.cache, itemKey(input.ItemID))
 	invalidateListCache(ctx, s.cache, itemListVersionKey(input.UserID))
 
+	tags, err := s.tagRepo.FindByItemID(ctx, updated.ID)
+	if err != nil {
+		return nil, NewServiceError(ErrInternal, "get item tags internal error", err)
+	}
+	updated.Tags = tags
+
 	return updated, nil
 }
 

@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"qvarkk/kvault/logger"
 	"strconv"
 	"time"
 
@@ -18,7 +17,7 @@ type cachedList[T any] struct {
 func listVersion(ctx context.Context, cache CacheStore, versionKey string) int64 {
 	val, err := cache.Get(ctx, versionKey)
 	if err != nil {
-		logger.Logger.Warn("failed to get list cache version",
+		zap.L().Warn("failed to get list cache version",
 			zap.String("versionKey", versionKey),
 			zap.Error(err),
 		)
@@ -34,7 +33,7 @@ func listVersion(ctx context.Context, cache CacheStore, versionKey string) int64
 func invalidateListCache(ctx context.Context, cache CacheStore, versionKey string) {
 	_, err := cache.Incr(ctx, versionKey)
 	if err != nil {
-		logger.Logger.Warn("failed to invalidate list cache",
+		zap.L().Warn("failed to invalidate list cache",
 			zap.String("versionKey", versionKey),
 			zap.Error(err),
 		)
@@ -43,7 +42,7 @@ func invalidateListCache(ctx context.Context, cache CacheStore, versionKey strin
 
 func invalidateSingleCache(ctx context.Context, cache CacheStore, key string) {
 	if err := cache.Del(ctx, key); err != nil {
-		logger.Logger.Warn("failed to invalidate single cache",
+		zap.L().Warn("failed to invalidate single cache",
 			zap.String("key", key),
 			zap.Error(err),
 		)

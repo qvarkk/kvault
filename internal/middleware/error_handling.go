@@ -4,7 +4,6 @@ import (
 	"errors"
 	"qvarkk/kvault/internal/httpx"
 	"qvarkk/kvault/internal/services"
-	"qvarkk/kvault/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -42,7 +41,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 		}
 
 		for _, ginErr := range c.Errors {
-			logger.Logger.Error("request error",
+			zap.L().Error("request error",
 				zap.String("path", c.FullPath()),
 				zap.String("method", c.Request.Method),
 				zap.Error(ginErr.Err),

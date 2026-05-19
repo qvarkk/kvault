@@ -38,13 +38,13 @@ func main() {
 
 	pg, err := postgres.NewPostgres(pgConfig)
 	if err != nil {
-		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
+		zap.L().Fatal("Connection to database failed", zap.Error(err))
 	}
 	defer pg.Close()
 
 	aws, err := aws.NewAwsStorage(config.Aws)
 	if err != nil {
-		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
+		zap.L().Fatal("Connection to AWS failed", zap.Error(err))
 	}
 
 	srv := asynq.NewServer(
@@ -52,7 +52,7 @@ func main() {
 			Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
 			Username: config.Redis.User,
 			Password: config.Redis.Password,
-			DB:       0,
+			DB:       config.Redis.QueueDb,
 		},
 		asynq.Config{Concurrency: config.Worker.ConcurrentTasks},
 	)

@@ -18,11 +18,12 @@ const (
 )
 
 type AwsStorage struct {
-	s3Client      *s3.Client
-	presignClient *s3.PresignClient
-	bucketName    string
-	prefix        string
-	urlExpiration time.Duration
+	s3Client          *s3.Client
+	presignClient     *s3.PresignClient
+	bucketName        string
+	prefix            string
+	urlExpiration     time.Duration
+	publicEndpointUrl string
 }
 
 func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
@@ -36,11 +37,12 @@ func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
 	})
 
 	return &AwsStorage{
-		s3Client:      client,
-		presignClient: s3.NewPresignClient(client),
-		bucketName:    config.S3Bucket,
-		prefix:        uploadsPrefix,
-		urlExpiration: time.Duration(config.UrlExpirationTimeSeconds) * time.Second,
+		s3Client:          client,
+		presignClient:     s3.NewPresignClient(client),
+		bucketName:        config.S3Bucket,
+		prefix:            uploadsPrefix,
+		urlExpiration:     config.UrlExpiration,
+		publicEndpointUrl: config.PublicEndpointUrl,
 	}, nil
 }
 
@@ -94,7 +96,20 @@ func (s *AwsStorage) GeneratePresignUrl(
 		return "", time.Time{}, err
 	}
 
-	return presignedResult.URL, time.Now().UTC().Add(s.urlExpiration), nil
+	resultURL := presignedResult.URL
+	if s.publicEndpointUrl != "" {
+		parsed, err := url.Parse(presignedResult.URL)
+		if err == nil {
+			pub, err := url.Parse(s.publicEndpointUrl)
+			if err == nil {
+				parsed.Scheme = pub.Scheme
+				parsed.Host = pub.Host
+				resultURL = parsed.String()
+			}
+		}
+	}
+
+	return resultURL, time.Now().UTC().Add(s.urlExpiration), nil
 }
 
 func (s *AwsStorage) fullKey(key string) string {

@@ -46,7 +46,7 @@ func main() {
 
 	pg, err := postgres.NewPostgres(pgConfig)
 	if err != nil {
-		logger.Logger.Fatal("Connection to database failed", zap.Error(err))
+		zap.L().Fatal("Connection to database failed", zap.Error(err))
 	}
 	defer pg.Close()
 
@@ -60,7 +60,7 @@ func main() {
 
 	enqueuer, err := redis.NewAsynqEnqueuer(queueConfig)
 	if err != nil {
-		logger.Logger.Fatal("Asynq connection to Redis failed", zap.Error(err))
+		zap.L().Fatal("Asynq connection to Redis failed", zap.Error(err))
 	}
 
 	cacheConfig := redis.CacheConfig{
@@ -77,7 +77,7 @@ func main() {
 		storeConfig.DB = config.Redis.CacheDb
 		redisClient, err := redis.NewRedisStore(storeConfig, cacheConfig)
 		if err != nil {
-			logger.Logger.Fatal("Cache connection to Redis failed", zap.Error(err))
+			zap.L().Fatal("Cache connection to Redis failed", zap.Error(err))
 		}
 		cacheStore = redisClient
 	} else {
@@ -86,7 +86,7 @@ func main() {
 
 	aws, err := aws.NewAwsStorage(config.Aws)
 	if err != nil {
-		logger.Logger.Fatal("Connection to AWS failed", zap.Error(err))
+		zap.L().Fatal("Connection to AWS failed", zap.Error(err))
 	}
 
 	var (

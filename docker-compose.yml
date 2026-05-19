@@ -27,7 +27,7 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     volumes:
-      - ./tmp/postgresql:/var/lib/postgresql/18/docker
+      - pg_data:/var/lib/postgresql/18/docker
     environment:
       - POSTGRES_DB=${DB_DATABASE}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -53,3 +53,6 @@ services:
       - "./tmp/garage/meta:/var/lib/garage/meta"
       - "./tmp/garage/data:/var/lib/garage/data"
     container_name: kvault_garage
+
+volumes:
+  pg_data:

@@ -6,8 +6,9 @@ import (
 )
 
 type TagRef struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Source string `json:"source"`
 }
 
 type TagResponse struct {
@@ -30,7 +31,8 @@ func toTagResponse(tag *domain.Tag) TagResponse {
 
 func toTagRef(tag *domain.Tag) TagRef {
 	return TagRef{
-		ID:   tag.ID,
-		Name: tag.Name,
+		ID:     tag.ID,
+		Name:   tag.Name,
+		Source: string(tag.Source),
 	}
 }

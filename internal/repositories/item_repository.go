@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"strings"
 	"time"
+	"unicode"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -49,28 +51,38 @@ func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.
 		Where(sq.Eq{"i.user_id": f.UserID}).
 		Where(sq.Eq{"i.deleted_at": nil})
 
+	var tsQuery string
 	if f.Query != "" {
-		baseQuery = baseQuery.Where("i.search_vector @@ websearch_to_tsquery('simple', ?)", f.Query)
+		tsQuery = buildTsQuery(f.Query)
+		if tsQuery != "" {
+			baseQuery = baseQuery.Where("i.search_vector @@ to_tsquery('simple', ?)", tsQuery)
+		}
 	}
 
 	if f.Type != "" {
 		baseQuery = baseQuery.Where(sq.Eq{"i.type": f.Type})
 	}
 
+	var countQuery sq.SelectBuilder
 	if len(f.TagIDs) > 0 {
 		baseQuery = baseQuery.
 			Join("item_tags it ON it.item_id = i.id").
-			Where(sq.Eq{"it.tag_id": f.TagIDs}).
-			GroupBy("i.id")
+			Where(sq.Eq{"it.tag_id": f.TagIDs})
+		countQuery = baseQuery.Column("COUNT(DISTINCT i.id)")
+		baseQuery = baseQuery.GroupBy("i.id")
+	} else {
+		countQuery = baseQuery.Columns("COUNT(*)")
 	}
 
 	// TODO: unify orderby with handler somehow, sql injection possible
-	itemsQuery := baseQuery.
-		Columns("i.*").
+	itemsQuery := baseQuery.Columns("i.*")
+	if tsQuery != "" {
+		itemsQuery = itemsQuery.OrderByClause(sq.Expr("ts_rank(i.search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
+	}
+	itemsQuery = itemsQuery.
 		OrderBy(fmt.Sprintf("i.%s %s", f.Column, f.Direction)).
 		Offset(offset).
 		Limit(uint64(f.PageSize))
-	countQuery := baseQuery.Columns("COUNT(*)")
 
 	itemsQuerySql, itemsArgs, err := itemsQuery.ToSql()
 	if err != nil {
@@ -250,4 +262,24 @@ func (r *ItemRepo) FindIDsByTagID(ctx context.Context, tagID string) ([]string, 
 	var itemIDs []string
 	err = r.db.SelectContext(ctx, &itemIDs, sql, args...)
 	return itemIDs, toRepositoryError(err)
+}
+
+func buildTsQuery(input string) string {
+	tokens := strings.Fields(input)
+	parts := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		var b strings.Builder
+		for _, r := range t {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
+				b.WriteRune(r)
+			}
+		}
+		if s := b.String(); s != "" {
+			parts = append(parts, s+":*")
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " & ")
 }

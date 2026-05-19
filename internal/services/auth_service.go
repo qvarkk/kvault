@@ -34,7 +34,7 @@ func (a *AuthService) GenerateApiKey(ctx context.Context) (string, error) {
 
 		isKeyUnique, err := a.userRepo.IsApiKeyUnique(ctx, apiKey)
 		if err != nil {
-			errMsg := fmt.Sprintf("couldn't verify if api key %s is unique", apiKey)
+			errMsg := fmt.Sprintf("couldn't verify if api key %q is unique", apiKey)
 			return "", NewServiceError(ErrInternal, errMsg, err)
 		}
 

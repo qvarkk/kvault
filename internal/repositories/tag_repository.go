@@ -166,7 +166,7 @@ func (r *TagRepo) DeleteByID(ctx context.Context, tagID string) error {
 
 func (r *TagRepo) FindByItemID(ctx context.Context, itemID string) ([]domain.Tag, error) {
 	sql, args, err := r.queryBuilder.
-		Select("t.*").
+		Select("t.*", "it.source").
 		From("tags t").
 		Join("item_tags it ON it.tag_id = t.id").
 		Where(sq.Eq{"it.item_id": itemID}).
@@ -189,7 +189,7 @@ func (r *TagRepo) FindByItemIDs(
 	}
 
 	sql, args, err := r.queryBuilder.
-		Select("t.id", "t.name", "t.user_id", "t.created_at", "t.updated_at", "it.item_id").
+		Select("t.id", "t.name", "t.user_id", "t.created_at", "t.updated_at", "it.item_id", "it.source").
 		From("tags t").
 		Join("item_tags it ON it.tag_id = t.id").
 		Where(sq.Eq{"it.item_id": itemIDs}).
@@ -215,6 +215,7 @@ func (r *TagRepo) FindByItemIDs(
 			&tag.CreatedAt,
 			&tag.UpdatedAt,
 			&itemID,
+			&tag.Source,
 		)
 		if err != nil {
 			return nil, toRepositoryError(err)

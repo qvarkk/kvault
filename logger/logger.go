@@ -7,8 +7,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var Logger *zap.Logger
-
 func Init(filename string, debug bool) error {
 	logFile, err := os.OpenFile(filename+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -34,10 +32,10 @@ func Init(filename string, debug bool) error {
 		zapcore.NewCore(stdoutEncoder, zapcore.AddSync(os.Stdout), level),
 	)
 
-	Logger = zap.New(core)
+	zap.ReplaceGlobals(zap.New(core))
 	return err
 }
 
 func Sync() {
-	Logger.Sync()
+	zap.L().Sync()
 }

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"qvarkk/kvault/logger"
 
 	"github.com/lib/pq"
 	"go.uber.org/zap"
@@ -36,7 +35,7 @@ func toRepositoryError(err error) error {
 		return wrapError(ErrNotFound, err)
 	}
 
-	logger.Logger.Error("unrecognized DB error was caught", zap.Error(err))
+	zap.L().Error("unrecognized DB error was caught", zap.Error(err))
 	return wrapError(ErrUnknown, err)
 }
 
