@@ -11,6 +11,9 @@ RUN go mod download
 
 COPY . .
 
+RUN go install github.com/swaggo/swag/cmd/swag@latest && \
+    swag init --dir ./cmd/api,./internal/httpx,./internal/handlers/web --output ./docs
+
 RUN go build -o api ./cmd/api && \
     go build -o worker ./cmd/worker && \
     go build -o migrate ./cmd/migrate
