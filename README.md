@@ -30,6 +30,7 @@ mv .env.example .env
 # 2. Also grab the required config files
 mkdir -p docker/redis docker/garage
 curl -o docker/redis/redis.conf https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
+curl -o docker/redis/entrypoint.sh https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/entrypoint.sh
 curl -o docker/garage/garage.toml https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
 
 # 3. Edit .env - set these before starting:

@@ -39,13 +39,3 @@ jobs:
           cache-from: type=gha,scope=kvault
           cache-to: type=gha,mode=max,scope=kvault
 
-      - name: Build and push kvault-redis
-        uses: docker/build-push-action@v6
-        with:
-          context: ./docker/redis
-          push: true
-          tags: |
-            ghcr.io/qvarkk/kvault-redis:latest
-            registry.gitlab.com/qvarkk/kvault/redis:latest
-          cache-from: type=gha,scope=kvault-redis
-          cache-to: type=gha,mode=max,scope=kvault-redis
