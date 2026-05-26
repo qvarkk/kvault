@@ -11,6 +11,7 @@ import (
 	awslib "github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 const (
@@ -44,14 +45,36 @@ func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
 		})
 	}
 
-	return &AwsStorage{
+	storage := &AwsStorage{
 		s3Client:          client,
 		presignClient:     s3.NewPresignClient(presignBase),
 		bucketName:        config.S3Bucket,
 		prefix:            uploadsPrefix,
 		urlExpiration:     config.UrlExpiration,
 		viewUrlExpiration: config.ViewUrlExpiration,
-	}, nil
+	}
+
+	if err := storage.setupCors(context.TODO()); err != nil {
+		return nil, fmt.Errorf("setup bucket CORS: %w", err)
+	}
+
+	return storage, nil
+}
+
+func (s *AwsStorage) setupCors(ctx context.Context) error {
+	_, err := s.s3Client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
+		Bucket: awslib.String(s.bucketName),
+		CORSConfiguration: &types.CORSConfiguration{
+			CORSRules: []types.CORSRule{
+				{
+					AllowedOrigins: []string{"*"},
+					AllowedMethods: []string{"GET", "HEAD"},
+					AllowedHeaders: []string{"*"},
+				},
+			},
+		},
+	})
+	return err
 }
 
 func (s *AwsStorage) Upload(
