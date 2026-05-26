@@ -54,6 +54,10 @@ type Item struct {
 	SearchVector string         `db:"search_vector"`
 	DeletedAt    sql.NullTime   `db:"deleted_at"`
 
+	SourceURL        sql.NullString `db:"source_url"`
+	UrlMetadata      sql.NullString `db:"url_metadata"`
+	ExtractedContent sql.NullString `db:"extracted_content"`
+
 	Tags []Tag
 }
 

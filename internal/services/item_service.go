@@ -17,6 +17,7 @@ type ItemRepo interface {
 	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
+	UpdateUrlContentTx(context.Context, *sqlx.Tx, *domain.Item) error
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
@@ -33,14 +34,16 @@ type ItemService struct {
 	tagRepo      TagRepo
 	transactor   Transactor
 	cache        CacheStore
+	enqueuer     TaskEnqueuer
 	itemCacheTtl time.Duration
 }
 
 type CreateItemInput struct {
-	UserID  string
-	Type    string
-	Title   string
-	Content string
+	UserID    string
+	Type      string
+	Title     string
+	Content   string
+	SourceURL string
 }
 
 type UpdateItemInput struct {
@@ -55,6 +58,7 @@ func NewItemService(
 	tagRepo TagRepo,
 	transactor Transactor,
 	cache CacheStore,
+	enqueuer TaskEnqueuer,
 	cacheTtl time.Duration,
 ) *ItemService {
 	return &ItemService{
@@ -62,16 +66,18 @@ func NewItemService(
 		tagRepo:      tagRepo,
 		transactor:   transactor,
 		cache:        cache,
+		enqueuer:     enqueuer,
 		itemCacheTtl: cacheTtl,
 	}
 }
 
 func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*domain.Item, error) {
 	item := &domain.Item{
-		UserID:  input.UserID,
-		Type:    domain.ItemType(input.Type),
-		Title:   input.Title,
-		Content: NewNullString(input.Content),
+		UserID:    input.UserID,
+		Type:      domain.ItemType(input.Type),
+		Title:     input.Title,
+		Content:   NewNullString(input.Content),
+		SourceURL: NewNullString(input.SourceURL),
 	}
 
 	err := s.itemRepo.CreateNew(ctx, item)
@@ -80,6 +86,10 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	}
 
 	invalidateListCache(ctx, s.cache, itemListVersionKey(input.UserID))
+
+	if item.Type == domain.ItemTypeUrl && item.SourceURL.Valid {
+		_ = s.enqueuer.EnqueueUrlFetch(ctx, input.UserID, item.ID)
+	}
 
 	return item, nil
 }
@@ -361,6 +371,21 @@ func (s *ItemService) PermanentlyDeleteByID(ctx context.Context, itemID, userID 
 		s.itemRepo.GetDeletedByIDForUpdate,
 		s.itemRepo.PermanentlyDeleteByIDTx,
 	)
+}
+
+func (s *ItemService) RefetchUrl(ctx context.Context, itemID, userID string) error {
+	item, err := s.itemRepo.GetByID(ctx, itemID)
+	if err != nil {
+		return NewServiceError(ErrItemNotFound, "not found", err)
+	}
+	if item.UserID != userID {
+		return NewServiceError(ErrItemNotFound, "forbidden", nil)
+	}
+	if item.Type != domain.ItemTypeUrl {
+		return NewServiceError(ErrInternal, "item is not a url type", nil)
+	}
+
+	return s.enqueuer.EnqueueUrlFetch(ctx, userID, itemID)
 }
 
 func itemKey(itemID string) string {

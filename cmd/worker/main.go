@@ -58,12 +58,17 @@ func main() {
 	)
 
 	fileRepo := repositories.NewFileRepo(pg.DB)
+	itemRepo := repositories.NewItemRepo(pg.DB)
 	transactor := repositories.NewTransactor(pg.DB)
 	fileService := services.NewFileTaskService(fileRepo, transactor, aws)
 	fileTaskHandler := worker.NewFileTaskHandler(fileService)
 
+	urlTaskService := services.NewUrlTaskService(itemRepo, transactor)
+	urlFetchHandler := worker.NewUrlFetchHandler(urlTaskService)
+
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(tasks.TypePdfProcess, fileTaskHandler.HandlePdfProcessTask)
+	mux.HandleFunc(tasks.TypeUrlFetch, urlFetchHandler.HandleUrlFetchTask)
 
 	if err := srv.Run(mux); err != nil {
 		log.Fatal(err)

@@ -29,8 +29,8 @@ func NewItemRepo(db *sqlx.DB) *ItemRepo {
 
 func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	sql, args, err := r.queryBuilder.
-		Insert("items").Columns("user_id", "type", "title", "content").
-		Values(item.UserID, item.Type, item.Title, item.Content).
+		Insert("items").Columns("user_id", "type", "title", "content", "source_url").
+		Values(item.UserID, item.Type, item.Title, item.Content, item.SourceURL).
 		Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -335,6 +335,22 @@ func (r *ItemRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 	}
 
 	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) UpdateUrlContentTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item) error {
+	sql, args, err := r.queryBuilder.
+		Update("items").
+		Set("url_metadata", item.UrlMetadata).
+		Set("extracted_content", item.ExtractedContent).
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"id": item.ID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, sql, args...)
 	return toRepositoryError(err)
 }
 

@@ -28,6 +28,7 @@ type ItemHandler interface {
 	BindTag(*gin.Context) error
 	UnbindTag(*gin.Context) error
 	Autotag(*gin.Context) error
+	Refetch(*gin.Context) error
 }
 
 type FileHandler interface {

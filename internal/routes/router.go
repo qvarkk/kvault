@@ -85,6 +85,8 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandle
 
 	group.POST("/:id/tags", web.APIWrap(h.BindTag))
 	group.DELETE("/:id/tags/:tag_id", web.APIWrap(h.UnbindTag))
+
+	group.POST("/:id/refetch", web.APIWrap(h.Refetch))
 }
 
 func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandler) {

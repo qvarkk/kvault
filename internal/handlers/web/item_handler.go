@@ -22,6 +22,7 @@ type ItemService interface {
 	BindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
 	UnbindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
 	Autotag(ctx context.Context, itemID, userID string, count int) ([]domain.Tag, error)
+	RefetchUrl(ctx context.Context, itemID, userID string) error
 }
 
 type ItemHandler struct {
@@ -35,9 +36,10 @@ func NewItemHandler(itemService ItemService) *ItemHandler {
 }
 
 type createItemRequest struct {
-	Type    string `json:"type" binding:"required,oneof=text url"`
-	Title   string `json:"title" binding:"required" example:"Example title"`
-	Content string `json:"content" example:"Some content blah blah."`
+	Type      string `json:"type" binding:"required,oneof=text url"`
+	Title     string `json:"title" binding:"required" example:"Example title"`
+	Content   string `json:"content" example:"Some content blah blah."`
+	SourceURL string `json:"source_url" example:"https://example.com/article"`
 }
 
 type listItemQuery struct {
@@ -91,10 +93,11 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 	}
 
 	itemInput := services.CreateItemInput{
-		UserID:  userID,
-		Type:    req.Type,
-		Title:   req.Title,
-		Content: req.Content,
+		UserID:    userID,
+		Type:      req.Type,
+		Title:     req.Title,
+		Content:   req.Content,
+		SourceURL: req.SourceURL,
 	}
 
 	item, err := h.itemService.CreateNew(ctx.Request.Context(), itemInput)
@@ -469,3 +472,31 @@ func (h *ItemHandler) ClearTrash(ctx *gin.Context) error {
 	ctx.Status(http.StatusNoContent)
 	return nil
 }
+
+// @Summary      Re-fetch URL content
+// @Description  Re-enqueues a URL fetch task for a url-type item
+// @Tags         Items
+// @Security     ApiKeyAuth
+// @Param        id path string true "Item ID"
+// @Success      202
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /items/{id}/refetch [post]
+func (h *ItemHandler) Refetch(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri itemIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	if err := h.itemService.RefetchUrl(ctx.Request.Context(), uri.ID, userID); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusAccepted)
+	return nil
+}
+
