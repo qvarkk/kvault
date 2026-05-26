@@ -13,6 +13,7 @@ import (
 	"qvarkk/kvault/logger"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
@@ -121,6 +122,9 @@ func main() {
 		User: userService,
 	}
 
+	if !config.Debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := routes.SetupRouter(hs, ms, config.Api.CorsOrigins)
 	r.Run(fmt.Sprintf(":%d", config.Api.Port))
 }
