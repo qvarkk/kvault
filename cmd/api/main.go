@@ -84,7 +84,7 @@ func main() {
 		cacheStore = redis.NewNoopCache()
 	}
 
-	aws, err := aws.NewAwsStorage(config.Aws)
+	aws, err := aws.NewAwsStorage(config.Aws, config.Api.CorsOrigins)
 	if err != nil {
 		zap.L().Fatal("Connection to AWS failed", zap.Error(err))
 	}

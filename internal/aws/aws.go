@@ -27,7 +27,7 @@ type AwsStorage struct {
 	viewUrlExpiration time.Duration
 }
 
-func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
+func NewAwsStorage(config config.AwsConfig, corsOrigins []string) (*AwsStorage, error) {
 	awsConfig, err := awscfg.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, err
@@ -54,20 +54,22 @@ func NewAwsStorage(config config.AwsConfig) (*AwsStorage, error) {
 		viewUrlExpiration: config.ViewUrlExpiration,
 	}
 
-	if err := storage.setupCors(context.TODO()); err != nil {
-		return nil, fmt.Errorf("setup bucket CORS: %w", err)
+	if len(corsOrigins) > 0 {
+		if err := storage.setupCors(context.TODO(), corsOrigins); err != nil {
+			return nil, fmt.Errorf("setup bucket CORS: %w", err)
+		}
 	}
 
 	return storage, nil
 }
 
-func (s *AwsStorage) setupCors(ctx context.Context) error {
+func (s *AwsStorage) setupCors(ctx context.Context, corsOrigins []string) error {
 	_, err := s.s3Client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
 		Bucket: awslib.String(s.bucketName),
 		CORSConfiguration: &types.CORSConfiguration{
 			CORSRules: []types.CORSRule{
 				{
-					AllowedOrigins: []string{"*"},
+					AllowedOrigins: corsOrigins,
 					AllowedMethods: []string{"GET", "HEAD"},
 					AllowedHeaders: []string{"*"},
 				},

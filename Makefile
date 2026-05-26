@@ -1,4 +1,4 @@
-.PHONY: run-api build-api run-worker build-worker clean swagger swagger-install docker-up docker-down docker-logs tidy lint
+.PHONY: run-api build-api run-worker build-worker clean swagger swagger-install docker-up docker-up-infra docker-down docker-logs tidy lint
  
 # ── Variables ──
 APP_NAME         := kvault
@@ -79,6 +79,10 @@ swagger-install:
 ## docker-up: Start docker containers
 docker-up:
 	docker-compose up -d
+
+## docker-up-infra: Start infrastructure only (pg, redis, garage) for local development
+docker-up-infra:
+	docker-compose up -d pg redis garage
 
 ## docker-down: Stop docker containers
 docker-down:
