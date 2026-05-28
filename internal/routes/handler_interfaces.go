@@ -12,7 +12,7 @@ type AuthHandler interface {
 }
 
 type UserHandler interface {
-	GetByEmail(*gin.Context) error
+	GetByUsername(*gin.Context) error
 }
 
 type ItemHandler interface {

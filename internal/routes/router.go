@@ -66,8 +66,8 @@ func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandle
 
 func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h UserHandler) {
 	group := api.Group("/users", auth)
-	// TODO: RBAC, fix the idea that /users route only gets user by email lol
-	group.GET("", web.APIWrap(h.GetByEmail))
+	// TODO: RBAC, fix the idea that /users route only gets user by username lol
+	group.GET("", web.APIWrap(h.GetByUsername))
 }
 
 func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandler) {

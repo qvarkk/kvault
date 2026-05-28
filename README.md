@@ -37,6 +37,8 @@ curl -o docker/garage/garage.toml https://gitverse.ru/api/repos/qvarkk/kvault/ra
 # 4. Запустить
 docker compose pull
 docker compose up -d
+
+# 5. Выполнить настройку GarageHQ (см. далее)
 ```
 
 Фронтенд доступен по адресу `http://ваш-сервер`. Порт по умолчанию - 80, настраивается через `FRONTEND_PORT`.

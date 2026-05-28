@@ -14,7 +14,7 @@ import (
 type AuthUserRepo interface {
 	CreateNew(context.Context, *domain.User) error
 	GetByID(context.Context, string) (*domain.User, error)
-	GetByEmail(context.Context, string) (*domain.User, error)
+	GetByUsername(context.Context, string) (*domain.User, error)
 	UpdateApiKey(ctx context.Context, userID string, apiKey string) (*domain.User, error)
 	UpdatePassword(ctx context.Context, userID, passwordHash string) error
 	DeleteByID(ctx context.Context, userID string) error
@@ -50,7 +50,7 @@ func (a *AuthService) GenerateApiKey(ctx context.Context) (string, error) {
 
 func (a *AuthService) RegisterNewUser(
 	ctx context.Context,
-	email string,
+	username string,
 	password string,
 ) (*domain.User, error) {
 	apiKey, err := a.GenerateApiKey(ctx)
@@ -64,7 +64,7 @@ func (a *AuthService) RegisterNewUser(
 	}
 
 	user := &domain.User{
-		Email:    email,
+		Username: username,
 		Password: string(passwordHash),
 		APIKey:   apiKey,
 	}
@@ -82,12 +82,12 @@ func (a *AuthService) RegisterNewUser(
 
 func (a *AuthService) VerifyCredentials(
 	ctx context.Context,
-	email string,
+	username string,
 	password string,
 ) (*domain.User, error) {
-	user, err := a.userRepo.GetByEmail(ctx, email)
+	user, err := a.userRepo.GetByUsername(ctx, username)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to find user %s", email)
+		errMsg := fmt.Sprintf("failed to find user %s", username)
 		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, NewServiceError(ErrInvalidCredentials, errMsg, err)
 		}

@@ -7,7 +7,7 @@ import (
 
 type UserResponse struct {
 	ID        string `json:"id"`
-	Email     string `json:"email"`
+	Username  string `json:"username"`
 	APIKey    string `json:"api_key,omitempty"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
@@ -16,7 +16,7 @@ type UserResponse struct {
 func toUserResponse(user *domain.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
-		Email:     user.Email,
+		Username:  user.Username,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 	}
@@ -25,7 +25,7 @@ func toUserResponse(user *domain.User) UserResponse {
 func toUserResponseWithApiKey(user *domain.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
-		Email:     user.Email,
+		Username:  user.Username,
 		APIKey:    user.APIKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),

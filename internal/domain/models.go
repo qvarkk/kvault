@@ -36,7 +36,7 @@ const (
 
 type User struct {
 	ID        string    `db:"id"`
-	Email     string    `db:"email"`
+	Username  string    `db:"username"`
 	Password  string    `db:"password"`
 	APIKey    string    `db:"api_key"`
 	CreatedAt time.Time `db:"created_at"`

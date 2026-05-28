@@ -10,7 +10,7 @@ import (
 )
 
 type UserService interface {
-	GetByEmail(context.Context, string) (*domain.User, error)
+	GetByUsername(context.Context, string) (*domain.User, error)
 }
 
 type UserHandler struct {
@@ -22,13 +22,13 @@ func NewUserHandler(userService UserService) *UserHandler {
 }
 
 // TODO: fix
-func (h *UserHandler) GetByEmail(ctx *gin.Context) error {
-	email := ctx.Query("email")
-	if email == "" {
+func (h *UserHandler) GetByUsername(ctx *gin.Context) error {
+	username := ctx.Query("username")
+	if username == "" {
 		return httpx.ErrBadRequest
 	}
 
-	user, err := h.userService.GetByEmail(ctx.Request.Context(), email)
+	user, err := h.userService.GetByUsername(ctx.Request.Context(), username)
 	if err != nil {
 		return err
 	}

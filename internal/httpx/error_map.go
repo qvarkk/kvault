@@ -48,7 +48,7 @@ var serviceErrorRules = []mappingRule{
 		public: &PublicError{
 			Err:     ErrUnprocessableEntity,
 			Key:     "err.user_already_exists",
-			Message: "User with this email already exists.",
+			Message: "User with this username already exists.",
 		},
 	},
 	{

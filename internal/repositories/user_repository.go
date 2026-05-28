@@ -11,7 +11,7 @@ import (
 
 var (
 	UserFieldID     = "id"
-	UserFieldEmail  = "email"
+	UserFieldUsername = "username"
 	UserFieldApiKey = "api_key"
 )
 
@@ -31,8 +31,8 @@ func NewUserRepo(db *sqlx.DB) *UserRepo {
 
 func (r *UserRepo) CreateNew(ctx context.Context, user *domain.User) error {
 	sql, args, err := r.queryBuilder.
-		Insert("users").Columns("email", "password", "api_key").
-		Values(user.Email, user.Password, user.APIKey).
+		Insert("users").Columns("username", "password", "api_key").
+		Values(user.Username, user.Password, user.APIKey).
 		Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -65,8 +65,8 @@ func (r *UserRepo) GetByID(ctx context.Context, userID string) (*domain.User, er
 	return r.getByField(ctx, UserFieldID, userID)
 }
 
-func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.getByField(ctx, UserFieldEmail, email)
+func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
+	return r.getByField(ctx, UserFieldUsername, username)
 }
 
 func (r *UserRepo) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {

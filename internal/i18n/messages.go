@@ -52,9 +52,9 @@ var messages = map[string]map[string]string{
 		LocaleJA: "ユーザーが見つかりませんでした。",
 	},
 	"err.user_already_exists": {
-		LocaleEN: "User with this email already exists.",
-		LocaleRU: "Пользователь с таким email уже существует.",
-		LocaleJA: "このメールアドレスのユーザーはすでに存在します。",
+		LocaleEN: "User with this username already exists.",
+		LocaleRU: "Пользователь с таким именем пользователя уже существует.",
+		LocaleJA: "このユーザー名はすでに使用されています。",
 	},
 	"err.item_not_found": {
 		LocaleEN: "Item with given ID does not exist.",

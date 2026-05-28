@@ -10,8 +10,8 @@ import (
 
 type AuthService interface {
 	GenerateApiKey(context.Context) (string, error)
-	RegisterNewUser(ctx context.Context, email string, password string) (*domain.User, error)
-	VerifyCredentials(ctx context.Context, email string, password string) (*domain.User, error)
+	RegisterNewUser(ctx context.Context, username string, password string) (*domain.User, error)
+	VerifyCredentials(ctx context.Context, username string, password string) (*domain.User, error)
 	RotateApiKey(ctx context.Context, userID string) (*domain.User, error)
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 	VerifyPassword(ctx context.Context, userID, password string) error
@@ -42,12 +42,12 @@ type deleteAccountRequest struct {
 }
 
 type registerUserRequest struct {
-	Email    string `json:"email" binding:"required,email" example:"example@mail.com"`
+	Username string `json:"username" binding:"required,min=3" example:"john_doe"`
 	Password string `json:"password" binding:"required,min=8" example:"#strongPwd?123."`
 }
 
 type authenticateUserRequest struct {
-	Email    string `json:"email" binding:"required,email" example:"example@mail.com"`
+	Username string `json:"username" binding:"required,min=3" example:"john_doe"`
 	Password string `json:"password" binding:"required" example:"#strongPwd?123."`
 }
 
@@ -76,7 +76,7 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Email, req.Password)
+	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Email, req.Password)
+	user, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		return err
 	}
