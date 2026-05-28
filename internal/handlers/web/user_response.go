@@ -13,15 +13,6 @@ type UserResponse struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-func toUserResponse(user *domain.User) UserResponse {
-	return UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
-	}
-}
-
 func toUserResponseWithApiKey(user *domain.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,

@@ -15,7 +15,6 @@ import (
 type HandlerServices struct {
 	Auth     web.AuthService
 	AuthUser web.AuthUserService
-	User     web.UserService
 	Item     web.ItemService
 	File     web.FileService
 	Stopword web.StopwordService
@@ -43,7 +42,6 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices, corsOrigins []stri
 	auth := middleware.AuthRequired(ms.User)
 
 	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser, hs.File))
-	registerUserRoutes(api, auth, web.NewUserHandler(hs.User))
 	registerItemRoutes(api, auth, web.NewItemHandler(hs.Item))
 	registerFileRoutes(api, auth, web.NewFileHandler(hs.File))
 	registerStopwordRoutes(api, auth, web.NewStopwordHandler(hs.Stopword))
@@ -62,12 +60,6 @@ func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandle
 	protected.POST("/refresh", web.APIWrap(h.RotateApiKey))
 	protected.PATCH("/me/password", web.APIWrap(h.ChangePassword))
 	protected.POST("/me/delete", web.APIWrap(h.DeleteAccount))
-}
-
-func registerUserRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h UserHandler) {
-	group := api.Group("/users", auth)
-	// TODO: RBAC, fix the idea that /users route only gets user by username lol
-	group.GET("", web.APIWrap(h.GetByUsername))
 }
 
 func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandler) {

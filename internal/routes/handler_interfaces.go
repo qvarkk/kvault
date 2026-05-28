@@ -11,10 +11,6 @@ type AuthHandler interface {
 	DeleteAccount(*gin.Context) error
 }
 
-type UserHandler interface {
-	GetByUsername(*gin.Context) error
-}
-
 type ItemHandler interface {
 	Create(*gin.Context) error
 	List(*gin.Context) error

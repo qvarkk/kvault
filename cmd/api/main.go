@@ -111,7 +111,6 @@ func main() {
 	hs := &routes.HandlerServices{
 		Auth:     authService,
 		AuthUser: userService,
-		User:     userService,
 		Item:     itemService,
 		File:     fileService,
 		Stopword: stopwordService,

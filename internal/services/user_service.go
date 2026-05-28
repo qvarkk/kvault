@@ -10,7 +10,6 @@ import (
 
 type UserRepo interface {
 	GetByID(context.Context, string) (*domain.User, error)
-	GetByUsername(context.Context, string) (*domain.User, error)
 	GetByApiKey(context.Context, string) (*domain.User, error)
 }
 
@@ -39,10 +38,6 @@ func (u *UserService) GetByID(ctx context.Context, userID string) (*domain.User,
 	return u.getByField(ctx, repositories.UserFieldID, userID)
 }
 
-func (u *UserService) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
-	return u.getByField(ctx, repositories.UserFieldUsername, username)
-}
-
 func (u *UserService) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {
 	return u.getByField(ctx, repositories.UserFieldApiKey, apiKey)
 }
@@ -53,8 +48,6 @@ func (u *UserService) getByField(ctx context.Context, field string, value string
 	switch field {
 	case repositories.UserFieldID:
 		user, err = u.userRepo.GetByID(ctx, value)
-	case repositories.UserFieldUsername:
-		user, err = u.userRepo.GetByUsername(ctx, value)
 	case repositories.UserFieldApiKey:
 		user, err = u.userRepo.GetByApiKey(ctx, value)
 	}
