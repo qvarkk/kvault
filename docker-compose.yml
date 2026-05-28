@@ -1,6 +1,8 @@
 services:
   frontend:
-    image: ${REGISTRY}/kvault-frontend:latest
+    build:
+      context: ${KVAULT_FRONTEND_REPO:-https://gitverse.ru/qvarkk/kvault-frontend.git}#${KVAULT_VERSION:-main}
+    image: kvault-frontend
     ports:
       - "${FRONTEND_PORT:-80}:80"
     environment:
@@ -11,7 +13,9 @@ services:
     container_name: kvault_frontend
 
   api:
-    image: ${REGISTRY}/kvault:latest
+    build:
+      context: ${KVAULT_REPO:-https://gitverse.ru/qvarkk/kvault.git}#${KVAULT_VERSION:-main}
+    image: kvault
     env_file: .env
     depends_on:
       pg:
@@ -22,7 +26,8 @@ services:
     container_name: kvault_api
 
   worker:
-    image: ${REGISTRY}/kvault:latest
+    image: kvault
+    pull_policy: never
     command: ["./worker"]
     env_file: .env
     depends_on:
@@ -36,7 +41,8 @@ services:
     container_name: kvault_worker
 
   migrate:
-    image: ${REGISTRY}/kvault:latest
+    image: kvault
+    pull_policy: never
     command: ["./migrate", "up"]
     env_file: .env
     depends_on:
@@ -66,10 +72,11 @@ services:
       - POSTGRES_DB=${DB_DATABASE}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     container_name: kvault_pg
 
   garage:

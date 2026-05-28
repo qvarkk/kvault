@@ -49,7 +49,7 @@ curl -o docker/redis/entrypoint.sh   https://gitverse.ru/api/repos/qvarkk/kvault
 curl -o docker/garage/garage.toml    https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/garage/garage.toml
 ```
 
-> **Реестр образов.** По умолчанию используется `gitverse.ru/qvarkk` — он стабильно доступен в России. Если предпочитаете GitHub Container Registry, задайте в `.env` переменную `REGISTRY=ghcr.io/qvarkk` (из РФ доступ к ghcr может быть нестабилен).
+> **Образы собираются из исходников.** kvault не зависит от внешнего реестра образов — при первом запуске Docker сам скачивает исходный код из репозитория и собирает образы локально. Какую версию собирать, задаёт переменная `KVAULT_VERSION` в `.env` (любой git-тег, ветка или коммит; по умолчанию `main` — последняя версия). Подробнее — в разделе [Версии и обновление](#обновление-и-обслуживание).
 
 ---
 
@@ -73,9 +73,10 @@ curl -o docker/garage/garage.toml    https://gitverse.ru/api/repos/qvarkk/kvault
 ## Шаг 3. Первый запуск
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose up -d --build
 ```
+
+Флаг `--build` собирает образы из исходников (Docker скачает код из репозитория). Первая сборка занимает несколько минут — дальше образы кэшируются.
 
 Поднимутся все сервисы. Контейнер `migrate` один раз применит миграции базы данных и завершится — это нормально.
 
@@ -249,7 +250,9 @@ AWS_PUBLIC_ENDPOINT_URL=http://kvault.example.com:3900
 
 | Переменная | По умолчанию | Описание |
 | --- | --- | --- |
-| `REGISTRY` | `gitverse.ru/qvarkk` | Реестр образов: `gitverse.ru/qvarkk` или `ghcr.io/qvarkk`. |
+| `KVAULT_VERSION` | `main` | Версия для сборки: git-тег, ветка или коммит (напр. `v0.1.0`). |
+| `KVAULT_REPO` | gitverse | Репозиторий бэкенда. Переопределяйте, только если зеркалите код (напр. на GitHub). |
+| `KVAULT_FRONTEND_REPO` | gitverse | Репозиторий фронтенда. Аналогично. |
 | `DEBUG` | `false` | Режим отладки — в продакшене держите `false`. |
 | `API_PORT` | `6767` | Порт API **внутри** сети Docker. Наружу обычно не публикуется. |
 | `FRONTEND_PORT` | `80` | Порт фронтенда **на хосте**. Поменяйте при работе за реверс-прокси. |
@@ -310,14 +313,24 @@ AWS_PUBLIC_ENDPOINT_URL=http://kvault.example.com:3900
 
 ## Обновление и обслуживание
 
-**Обновить до свежих образов:**
+**Выбор версии.** Версию задаёт `KVAULT_VERSION` в `.env`. Для воспроизводимого развёртывания фиксируйте конкретный тег:
 
 ```bash
-docker compose pull
-docker compose up -d
+# .env
+KVAULT_VERSION=v0.1.0
 ```
 
-Новые миграции БД применятся автоматически при старте (контейнер `migrate`).
+Значение `main` (по умолчанию) собирает последнее состояние кода. Список версий — в разделе Releases репозитория.
+
+**Обновить / пересобрать:**
+
+```bash
+docker compose up -d --build
+```
+
+Команда заново скачивает исходники нужной версии и пересобирает образы. Новые миграции БД применятся автоматически при старте (контейнер `migrate`).
+
+> Откат к прежней версии: верните прежний `KVAULT_VERSION` и снова выполните `docker compose up -d --build`.
 
 **Резервное копирование.** Данные хранятся в именованных Docker-томах:
 

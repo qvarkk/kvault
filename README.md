@@ -50,9 +50,10 @@ curl -o docker/garage/garage.toml  https://gitverse.ru/api/repos/qvarkk/kvault/r
 
 # Перед запуском смените в .env как минимум DB_PASSWORD и REDIS_PASSWORD
 
-docker compose pull
-docker compose up -d
+docker compose up -d --build
 ```
+
+Образы собираются из исходников — внешний реестр не нужен. Версию задаёт `KVAULT_VERSION` в `.env` (git-тег/ветка, по умолчанию `main`).
 
 Фронтенд откроется на `http://<адрес-сервера>` (порт `80` по умолчанию).
 
