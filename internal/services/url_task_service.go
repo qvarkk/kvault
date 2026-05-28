@@ -28,19 +28,21 @@ type UrlTaskItemRepo interface {
 type UrlTaskService struct {
 	itemRepo   UrlTaskItemRepo
 	transactor Transactor
+	cache      CacheStore
 	httpClient *http.Client
 }
 
-func NewUrlTaskService(itemRepo UrlTaskItemRepo, transactor Transactor) *UrlTaskService {
+func NewUrlTaskService(itemRepo UrlTaskItemRepo, transactor Transactor, cache CacheStore) *UrlTaskService {
 	return &UrlTaskService{
 		itemRepo:   itemRepo,
 		transactor: transactor,
+		cache:      cache,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 func (s *UrlTaskService) FetchAndExtract(ctx context.Context, userID, itemID string) error {
-	return s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+	err := s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
 		item, err := s.itemRepo.GetActiveByIDForUpdate(ctx, tx, itemID)
 		if err != nil {
 			return NewServiceError(ErrItemNotFound, "not found", err)
@@ -67,6 +69,14 @@ func (s *UrlTaskService) FetchAndExtract(ctx context.Context, userID, itemID str
 
 		return s.itemRepo.UpdateUrlContentTx(ctx, tx, item)
 	})
+	if err != nil {
+		return err
+	}
+
+	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
+
+	return nil
 }
 
 func (s *UrlTaskService) fetchURL(rawURL string) (UrlMetadata, string, error) {

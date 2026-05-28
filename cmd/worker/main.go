@@ -9,6 +9,7 @@ import (
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/services"
+	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/tasks"
 	"qvarkk/kvault/logger"
 	"time"
@@ -57,13 +58,32 @@ func main() {
 		asynq.Config{Concurrency: config.Worker.ConcurrentTasks},
 	)
 
+	redisConnConfig := redis.ConnConfig{
+		Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	}
+
+	var cacheStore services.CacheStore
+	if config.Cache.Enabled {
+		cacheConnConfig := redisConnConfig
+		cacheConnConfig.DB = config.Redis.CacheDb
+		cacheClient, err := redis.NewRedisStore(cacheConnConfig, redis.CacheConfig{})
+		if err != nil {
+			zap.L().Fatal("Cache connection to Redis failed", zap.Error(err))
+		}
+		cacheStore = cacheClient
+	} else {
+		cacheStore = redis.NewNoopCache()
+	}
+
 	fileRepo := repositories.NewFileRepo(pg.DB)
 	itemRepo := repositories.NewItemRepo(pg.DB)
 	transactor := repositories.NewTransactor(pg.DB)
 	fileService := services.NewFileTaskService(fileRepo, transactor, aws)
 	fileTaskHandler := worker.NewFileTaskHandler(fileService)
 
-	urlTaskService := services.NewUrlTaskService(itemRepo, transactor)
+	urlTaskService := services.NewUrlTaskService(itemRepo, transactor, cacheStore)
 	urlFetchHandler := worker.NewUrlFetchHandler(urlTaskService)
 
 	mux := asynq.NewServeMux()
