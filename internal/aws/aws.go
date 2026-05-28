@@ -12,6 +12,7 @@ import (
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"go.uber.org/zap"
 )
 
 const (
@@ -56,7 +57,7 @@ func NewAwsStorage(config config.AwsConfig, corsOrigins []string) (*AwsStorage, 
 
 	if len(corsOrigins) > 0 {
 		if err := storage.setupCors(context.TODO(), corsOrigins); err != nil {
-			return nil, fmt.Errorf("setup bucket CORS: %w", err)
+			zap.L().Warn("failed to set up bucket CORS; file viewing from the browser may not work until the storage bucket is initialized", zap.Error(err))
 		}
 	}
 

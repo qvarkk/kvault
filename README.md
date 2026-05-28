@@ -55,9 +55,28 @@ docker compose up -d --build
 
 Образы собираются из исходников — внешний реестр не нужен. Версию задаёт `KVAULT_VERSION` в `.env` (git-тег/ветка, по умолчанию `main`).
 
+**Инициализация хранилища Garage (обязательно — без неё не работает загрузка файлов):**
+
+```bash
+alias garage="docker exec kvault_garage /garage"
+
+# Создать layout (подставьте <node-id> из вывода garage status)
+garage status
+garage layout assign -z dc1 -c 1G <node-id>
+garage layout apply --version 1
+
+# Создать ключ (сохраните Secret Key — позже недоступен) и бакет
+garage key create kvault-key
+garage bucket create kvault-bucket
+garage bucket allow --read --write --owner kvault-bucket --key kvault-key
+
+# Впишите Access Key ID и Secret Key в .env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), затем:
+docker compose up -d
+```
+
 Фронтенд откроется на `http://<адрес-сервера>` (порт `80` по умолчанию).
 
-> После первого запуска нужно один раз инициализировать хранилище Garage — иначе не будет работать загрузка файлов. Полные шаги, настройка домена и реверс-прокси описаны в **[HOSTING.md](./HOSTING.md)**.
+> Настройка домена, реверс-прокси и HTTPS, а также подробное описание шага с Garage — в **[HOSTING.md](./HOSTING.md)**.
 
 ---
 
