@@ -39,7 +39,7 @@ type createItemRequest struct {
 	Type      string `json:"type" binding:"required,oneof=text url"`
 	Title     string `json:"title" binding:"required" example:"Example title"`
 	Content   string `json:"content" example:"Some content blah blah."`
-	SourceURL string `json:"source_url" example:"https://example.com/article"`
+	SourceURL string `json:"source_url" binding:"omitempty,url" example:"https://example.com/article"`
 }
 
 type listItemQuery struct {
@@ -90,6 +90,10 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 	var req createItemRequest
 	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
 		return err
+	}
+
+	if req.Type == string(domain.ItemTypeUrl) && req.SourceURL == "" {
+		return services.NewServiceError(services.ErrUrlRequired, "source_url is required for url items", nil)
 	}
 
 	itemInput := services.CreateItemInput{
@@ -499,4 +503,3 @@ func (h *ItemHandler) Refetch(ctx *gin.Context) error {
 	ctx.Status(http.StatusAccepted)
 	return nil
 }
-

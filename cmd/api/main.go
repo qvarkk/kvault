@@ -20,7 +20,6 @@ import (
 // @title           KVault API
 // @version         1.0
 // @description     REST API for managing and searching notes and documents
-// @host            172.21.37.79:6767
 // @BasePath        /api/v1
 
 // @securityDefinitions.apikey ApiKeyAuth

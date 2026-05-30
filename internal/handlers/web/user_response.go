@@ -13,12 +13,21 @@ type UserResponse struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-func toUserResponseWithApiKey(user *domain.User) UserResponse {
+// toUserResponse renders a user without the API key (for /me and any read).
+func toUserResponse(user *domain.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
 		Username:  user.Username,
-		APIKey:    user.APIKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+// toUserResponseWithApiKey includes the freshly issued plaintext key. Used only
+// by register, login (rotate-on-login), and refresh — never by /me — because the
+// key is stored hashed and cannot be recovered afterwards.
+func toUserResponseWithApiKey(user *domain.User, apiKey string) UserResponse {
+	resp := toUserResponse(user)
+	resp.APIKey = apiKey
+	return resp
 }

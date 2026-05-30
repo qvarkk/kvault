@@ -49,6 +49,15 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 
 	defer func() {
 		if err != nil && p.FileID != "" {
+			// Log the root cause — otherwise the only signal is the file's
+			// "error" status, with no explanation anywhere (asynq's own logger
+			// is separate from zap and not captured here).
+			zap.L().Error(
+				"PDF process task failed",
+				zap.Error(err),
+				zap.String("file_id", p.FileID),
+				zap.String("user_id", p.UserID),
+			)
 			input := baseInput
 			input.Status = Ptr(domain.FileStatusError)
 			_, updateErr := h.fileService.UpdateFile(context.Background(), input)

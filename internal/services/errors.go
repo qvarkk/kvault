@@ -33,6 +33,8 @@ var (
 	ErrPdfFileFormat = errors.New("services: provided file has to be a PDF file")
 
 	ErrInsufficientContent = errors.New("service: insufficient content for autotagging")
+
+	ErrUrlRequired = errors.New("service: source_url is required for url items")
 )
 
 type ServiceError struct {

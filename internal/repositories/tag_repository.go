@@ -2,16 +2,23 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/sync/errgroup"
 )
 
 type ItemTagsByID map[string][]domain.Tag
+
+// tagSortColumns whitelists sortable columns for tags.
+var tagSortColumns = map[string]string{
+	"name":       "t.name",
+	"created_at": "t.created_at",
+	"updated_at": "t.updated_at",
+}
+
+const tagSortDefault = "t.updated_at"
 
 type TagRepo struct {
 	db           *sqlx.DB
@@ -55,13 +62,13 @@ func (r *TagRepo) List(
 		Where(sq.Eq{"t.user_id": params.UserID})
 
 	if params.Query != "" {
-		baseQuery = baseQuery.Where("t.name LIKE ?", "%"+params.Query+"%")
+		baseQuery = baseQuery.Where(`t.name ILIKE ? ESCAPE '\'`, "%"+escapeLike(params.Query)+"%")
 	}
 
 	tagsSql, tagsArgs, err := baseQuery.
 		Columns("t.*", "COUNT(it.item_id) AS item_count").
 		GroupBy("t.id").
-		OrderBy(fmt.Sprintf("t.%s %s", params.Column, params.Direction)).
+		OrderBy(safeOrderBy(params.Column, params.Direction, tagSortColumns, tagSortDefault)).
 		Offset(offset).
 		Limit(uint64(params.PageSize)).
 		ToSql()
@@ -74,31 +81,10 @@ func (r *TagRepo) List(
 		return nil, 0, toRepositoryError(err)
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	g, _ := errgroup.WithContext(ctx)
-
 	var tags []domain.Tag
-	g.Go(func() error {
-		if err := r.db.SelectContext(ctx, &tags, tagsSql, tagsArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
 	var count int
-	g.Go(func() error {
-		if err := r.db.GetContext(ctx, &count, countSql, countArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	_ = g.Wait()
-
-	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(cause)
+	if err := selectAndCount(ctx, r.db, tagsSql, tagsArgs, countSql, countArgs, &tags, &count); err != nil {
+		return nil, 0, err
 	}
 
 	return tags, count, nil

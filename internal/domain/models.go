@@ -8,8 +8,15 @@ import (
 type (
 	FileStatus     string
 	ItemType       string
+	UrlStatus      string
 	TagSource      string
 	StopwordSource string
+)
+
+const (
+	UrlStatusPending UrlStatus = "pending"
+	UrlStatusReady   UrlStatus = "ready"
+	UrlStatusError   UrlStatus = "error"
 )
 
 const (
@@ -35,12 +42,12 @@ const (
 )
 
 type User struct {
-	ID        string    `db:"id"`
-	Username  string    `db:"username"`
-	Password  string    `db:"password"`
-	APIKey    string    `db:"api_key"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	ID         string    `db:"id"`
+	Username   string    `db:"username"`
+	Password   string    `db:"password"`
+	APIKeyHash string    `db:"api_key_hash"`
+	CreatedAt  time.Time `db:"created_at"`
+	UpdatedAt  time.Time `db:"updated_at"`
 }
 
 type Item struct {
@@ -57,6 +64,7 @@ type Item struct {
 	SourceURL        sql.NullString `db:"source_url"`
 	UrlMetadata      sql.NullString `db:"url_metadata"`
 	ExtractedContent sql.NullString `db:"extracted_content"`
+	UrlStatus        sql.NullString `db:"url_status"`
 
 	Tags []Tag
 }

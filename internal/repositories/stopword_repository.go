@@ -4,10 +4,20 @@ import (
 	"context"
 	"fmt"
 	"qvarkk/kvault/internal/domain"
+	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 )
+
+// stopwordSortColumns whitelists sortable columns returned by active_stopwords().
+var stopwordSortColumns = map[string]string{
+	"word":       "word",
+	"source":     "source",
+	"updated_at": "updated_at",
+}
+
+const stopwordSortDefault = "source"
 
 type StopwordRepo struct {
 	db           *sqlx.DB
@@ -61,27 +71,32 @@ func (r *StopwordRepo) GetActiveStopwords(
 	ctx context.Context,
 	params domain.ListStopwordFilter,
 ) ([]domain.Stopword, error) {
-	// TODO: orderby injection
-	query := r.queryBuilder.
-		Select("*").
-		From(fmt.Sprintf("active_stopwords('%s')", params.UserID)).
-		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction))
+	// active_stopwords is a set-returning function; its argument and all filters
+	// are bound as parameters (no string interpolation), and the sort column is
+	// whitelisted.
+	var sb strings.Builder
+	sb.WriteString("SELECT word, source, is_enabled, updated_at FROM active_stopwords($1)")
+	args := []any{params.UserID}
 
+	var conds []string
 	if params.Query != "" {
-		query = query.Where("word LIKE ?", "%"+params.Query+"%")
+		args = append(args, "%"+escapeLike(params.Query)+"%")
+		conds = append(conds, fmt.Sprintf(`word ILIKE $%d ESCAPE '\'`, len(args)))
 	}
 	if params.Source != "" {
-		query = query.Where(sq.Eq{"source": params.Source})
+		args = append(args, params.Source)
+		conds = append(conds, fmt.Sprintf("source = $%d", len(args)))
+	}
+	if len(conds) > 0 {
+		sb.WriteString(" WHERE ")
+		sb.WriteString(strings.Join(conds, " AND "))
 	}
 
-	sql, args, err := query.ToSql()
-	if err != nil {
-		return nil, toRepositoryError(err)
-	}
+	sb.WriteString(" ORDER BY ")
+	sb.WriteString(safeOrderBy(params.Column, params.Direction, stopwordSortColumns, stopwordSortDefault))
 
 	var stopwords []domain.Stopword
-	if err := r.db.SelectContext(ctx, &stopwords, sql, args...); err != nil {
-		fmt.Printf("%s\n", sql)
+	if err := r.db.SelectContext(ctx, &stopwords, sb.String(), args...); err != nil {
 		return nil, toRepositoryError(err)
 	}
 

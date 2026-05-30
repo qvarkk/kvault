@@ -36,9 +36,9 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices, corsOrigins []stri
 	}))
 	r.Use(middleware.ErrorHandlingMiddleware())
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
 	api := r.Group("/api/v1")
+	api.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	auth := middleware.AuthRequired(ms.User)
 
 	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser, hs.File))
@@ -52,8 +52,11 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices, corsOrigins []stri
 
 func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandler) {
 	group := api.Group("/auth")
-	group.POST("/register", web.APIWrap(h.RegisterUser))
-	group.POST("/login", web.APIWrap(h.AuthenticateUser))
+
+	// Throttle credential endpoints per IP to blunt brute force / signup spam.
+	authLimit := middleware.AuthRateLimit()
+	group.POST("/register", authLimit, web.APIWrap(h.RegisterUser))
+	group.POST("/login", authLimit, web.APIWrap(h.AuthenticateUser))
 
 	protected := group.Group("/", auth)
 	protected.GET("/me", web.APIWrap(h.GetAuthenticatedUser))
@@ -90,6 +93,7 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandle
 	group.DELETE("/deleted/:id", web.APIWrap(h.PermanentlyDelete))
 	group.GET("/:id", web.APIWrap(h.Download))
 	group.GET("/:id/view", web.APIWrap(h.GetViewURL))
+	group.GET("/:id/info", web.APIWrap(h.GetInfo))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
 }

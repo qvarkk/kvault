@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/handlers/worker"
 	"qvarkk/kvault/internal/postgres"
+	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/services"
-	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/tasks"
 	"qvarkk/kvault/logger"
 	"time"
@@ -55,7 +56,18 @@ func main() {
 			Password: config.Redis.Password,
 			DB:       config.Redis.QueueDb,
 		},
-		asynq.Config{Concurrency: config.Worker.ConcurrentTasks},
+		asynq.Config{
+			Concurrency: config.Worker.ConcurrentTasks,
+			// Surface every failed task (including recovered panics, which never
+			// reach a handler's error return) in the worker's zap log.
+			ErrorHandler: asynq.ErrorHandlerFunc(func(_ context.Context, task *asynq.Task, err error) {
+				zap.L().Error("asynq task failed",
+					zap.String("type", task.Type()),
+					zap.ByteString("payload", task.Payload()),
+					zap.Error(err),
+				)
+			}),
+		},
 	)
 
 	redisConnConfig := redis.ConnConfig{

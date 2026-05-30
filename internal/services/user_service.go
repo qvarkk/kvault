@@ -3,14 +3,13 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repositories"
 )
 
 type UserRepo interface {
 	GetByID(context.Context, string) (*domain.User, error)
-	GetByApiKey(context.Context, string) (*domain.User, error)
+	GetByApiKeyHash(context.Context, string) (*domain.User, error)
 }
 
 type UserService struct {
@@ -22,11 +21,10 @@ func NewUserService(userRepo UserRepo) *UserService {
 }
 
 func (u *UserService) Authenticate(ctx context.Context, apiKey string) (*domain.User, error) {
-	user, err := u.GetByApiKey(ctx, apiKey)
+	user, err := u.GetByApiKeyHash(ctx, HashApiKey(apiKey))
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to authenticate user with API key = %s", apiKey)
 		if errors.Is(err, ErrUserNotFound) {
-			return nil, NewServiceError(ErrUnauthenticated, errMsg, err)
+			return nil, NewServiceError(ErrUnauthenticated, "invalid api key", err)
 		}
 		return nil, err
 	}
@@ -38,8 +36,8 @@ func (u *UserService) GetByID(ctx context.Context, userID string) (*domain.User,
 	return u.getByField(ctx, repositories.UserFieldID, userID)
 }
 
-func (u *UserService) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {
-	return u.getByField(ctx, repositories.UserFieldApiKey, apiKey)
+func (u *UserService) GetByApiKeyHash(ctx context.Context, apiKeyHash string) (*domain.User, error) {
+	return u.getByField(ctx, repositories.UserFieldApiKey, apiKeyHash)
 }
 
 func (u *UserService) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
@@ -49,15 +47,14 @@ func (u *UserService) getByField(ctx context.Context, field string, value string
 	case repositories.UserFieldID:
 		user, err = u.userRepo.GetByID(ctx, value)
 	case repositories.UserFieldApiKey:
-		user, err = u.userRepo.GetByApiKey(ctx, value)
+		user, err = u.userRepo.GetByApiKeyHash(ctx, value)
 	}
 
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to find user with %s = %s", field, value)
 		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, NewServiceError(ErrUserNotFound, errMsg, err)
+			return nil, NewServiceError(ErrUserNotFound, "user not found", err)
 		}
-		return nil, NewServiceError(ErrInternal, errMsg, err)
+		return nil, NewServiceError(ErrInternal, "failed to look up user", err)
 	}
 
 	return user, nil

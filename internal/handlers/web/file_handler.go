@@ -13,6 +13,7 @@ type FileService interface {
 	Upload(context.Context, string, *multipart.FileHeader) (*domain.File, error)
 	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
 	ListDeleted(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	GetByID(ctx context.Context, fileID, userID string) (*domain.File, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	GetFilePresignedViewUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	DeleteByID(ctx context.Context, fileID, userID string) error
@@ -208,6 +209,35 @@ func (h *FileHandler) withOwnedFileAction(
 	}
 
 	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Get file metadata
+// @Description  Returns the file's metadata (name, size, mime, status, timestamps) without a presigned URL
+// @Tags         Files
+// @Security     ApiKeyAuth
+// @Produce      json
+// @Param        id path string true "File ID"
+// @Success      200   {object}  FileResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      404   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /files/{id}/info [get]
+func (h *FileHandler) GetInfo(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri fileIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	file, err := h.fileService.GetByID(ctx.Request.Context(), uri.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.JSON(http.StatusOK, toFileResponse(file))
 	return nil
 }
 

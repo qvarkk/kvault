@@ -6,13 +6,13 @@ import (
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type AuthService interface {
-	GenerateApiKey(context.Context) (string, error)
-	RegisterNewUser(ctx context.Context, username string, password string) (*domain.User, error)
-	VerifyCredentials(ctx context.Context, username string, password string) (*domain.User, error)
-	RotateApiKey(ctx context.Context, userID string) (*domain.User, error)
+	RegisterNewUser(ctx context.Context, username string, password string) (*domain.User, string, error)
+	VerifyCredentials(ctx context.Context, username string, password string) (*domain.User, string, error)
+	RotateApiKey(ctx context.Context, userID string) (*domain.User, string, error)
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 	VerifyPassword(ctx context.Context, userID, password string) error
 	DeleteAccount(ctx context.Context, userID string) error
@@ -76,12 +76,12 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Username, req.Password)
+	user, apiKey, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		return err
 	}
 
-	ctx.JSON(http.StatusCreated, toUserResponseWithApiKey(user))
+	ctx.JSON(http.StatusCreated, toUserResponseWithApiKey(user, apiKey))
 	return nil
 }
 
@@ -102,12 +102,12 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Username, req.Password)
+	user, apiKey, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		return err
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user, apiKey))
 	return nil
 }
 
@@ -128,7 +128,7 @@ func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) error {
 		return err
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	ctx.JSON(http.StatusOK, toUserResponse(user))
 	return nil
 }
 
@@ -144,12 +144,12 @@ func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) error {
 func (h *AuthHandler) RotateApiKey(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
-	user, err := h.authService.RotateApiKey(ctx, userID)
+	user, apiKey, err := h.authService.RotateApiKey(ctx.Request.Context(), userID)
 	if err != nil {
 		return err
 	}
 
-	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user))
+	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user, apiKey))
 	return nil
 }
 
@@ -203,7 +203,13 @@ func (h *AuthHandler) DeleteAccount(ctx *gin.Context) error {
 		return err
 	}
 
-	_ = h.fileService.DeleteAllByUserID(ctx.Request.Context(), userID)
+	// Best-effort S3 cleanup before the cascading DB delete. Individual object
+	// failures are already logged inside the service; log a top-level failure too
+	// so orphaned objects are at least traceable.
+	if err := h.fileService.DeleteAllByUserID(ctx.Request.Context(), userID); err != nil {
+		zap.L().Warn("failed to delete user's files from storage during account deletion",
+			zap.String("user_id", userID), zap.Error(err))
+	}
 
 	if err := h.authService.DeleteAccount(ctx.Request.Context(), userID); err != nil {
 		return err

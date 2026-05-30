@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 type FileRepo interface {
@@ -27,6 +28,7 @@ type FileRepo interface {
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
 	PermanentlyDeleteByIDTx(context.Context, *sqlx.Tx, string) error
+	HardDeleteByID(ctx context.Context, fileID string) error
 }
 
 type FileService struct {
@@ -99,7 +101,16 @@ func (s *FileService) Upload(
 
 	err = s.tasker.EnqueuePdfProcess(ctx, userID, file.ID)
 	if err != nil {
-		_ = s.storage.Delete(ctx, s3Key)
+		// Compensate so the failed upload leaves no orphan: remove both the S3
+		// object and the just-created DB row.
+		if delErr := s.storage.Delete(ctx, s3Key); delErr != nil {
+			zap.L().Warn("failed to delete s3 object after enqueue failure",
+				zap.String("s3_key", s3Key), zap.Error(delErr))
+		}
+		if delErr := s.fileRepo.HardDeleteByID(ctx, file.ID); delErr != nil {
+			zap.L().Warn("failed to delete file row after enqueue failure",
+				zap.String("file_id", file.ID), zap.Error(delErr))
+		}
 		return nil, err
 	}
 
@@ -173,6 +184,17 @@ func (s *FileService) List(ctx context.Context, f domain.ListFileFilter) ([]doma
 	setToCache(ctx, s.cache, cacheKey, cachedList[domain.File]{Entities: files, Count: count}, s.fileCacheTtl)
 
 	return files, count, err
+}
+
+func (s *FileService) GetByID(ctx context.Context, fileID, userID string) (*domain.File, error) {
+	file, err := s.fileRepo.GetByID(ctx, fileID)
+	if err != nil {
+		return nil, NewServiceError(ErrFileNotFound, "not found", err)
+	}
+	if file.UserID != userID {
+		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
+	}
+	return file, nil
 }
 
 func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error) {
@@ -287,7 +309,8 @@ func (s *FileService) ClearTrash(ctx context.Context, userID string) error {
 	for _, f := range files {
 		if err := s.storage.Delete(ctx, f.S3Key); err != nil {
 			// best effort — log but continue so DB records are cleaned up
-			_ = err
+			zap.L().Warn("failed to delete s3 object while clearing trash",
+				zap.String("s3_key", f.S3Key), zap.String("file_id", f.ID), zap.Error(err))
 		}
 	}
 
@@ -327,7 +350,10 @@ func (s *FileService) DeleteAllByUserID(ctx context.Context, userID string) erro
 	}
 
 	for _, f := range files {
-		_ = s.storage.Delete(ctx, f.S3Key)
+		if err := s.storage.Delete(ctx, f.S3Key); err != nil {
+			zap.L().Warn("failed to delete s3 object while deleting user files",
+				zap.String("s3_key", f.S3Key), zap.String("file_id", f.ID), zap.Error(err))
+		}
 	}
 
 	return nil
