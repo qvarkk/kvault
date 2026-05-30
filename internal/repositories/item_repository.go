@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"qvarkk/kvault/internal/domain"
 	"strings"
 	"time"
@@ -10,8 +10,16 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/sync/errgroup"
 )
+
+// itemSortColumns whitelists sortable columns → their qualified SQL form.
+var itemSortColumns = map[string]string{
+	"title":      "i.title",
+	"created_at": "i.created_at",
+	"updated_at": "i.updated_at",
+}
+
+const itemSortDefault = "i.updated_at"
 
 type ItemRepo struct {
 	db           *sqlx.DB
@@ -28,9 +36,14 @@ func NewItemRepo(db *sqlx.DB) *ItemRepo {
 }
 
 func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
+	// url-type items start in "pending" until the worker fetches their content.
+	if item.Type == domain.ItemTypeUrl && !item.UrlStatus.Valid {
+		item.UrlStatus = sql.NullString{String: string(domain.UrlStatusPending), Valid: true}
+	}
+
 	sql, args, err := r.queryBuilder.
-		Insert("items").Columns("user_id", "type", "title", "content", "source_url").
-		Values(item.UserID, item.Type, item.Title, item.Content, item.SourceURL).
+		Insert("items").Columns("user_id", "type", "title", "content", "source_url", "url_status").
+		Values(item.UserID, item.Type, item.Title, item.Content, item.SourceURL, item.UrlStatus).
 		Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -74,13 +87,12 @@ func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.
 		countQuery = baseQuery.Columns("COUNT(*)")
 	}
 
-	// TODO: unify orderby with handler somehow, sql injection possible
 	itemsQuery := baseQuery.Columns("i.*")
 	if tsQuery != "" {
 		itemsQuery = itemsQuery.OrderByClause(sq.Expr("ts_rank(i.search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
 	}
 	itemsQuery = itemsQuery.
-		OrderBy(fmt.Sprintf("i.%s %s", f.Column, f.Direction)).
+		OrderBy(safeOrderBy(f.Column, f.Direction, itemSortColumns, itemSortDefault)).
 		Offset(offset).
 		Limit(uint64(f.PageSize))
 
@@ -94,29 +106,8 @@ func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.
 		return nil, 0, toRepositoryError(err)
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		if err := r.db.SelectContext(ctx, &items, itemsQuerySql, itemsArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	_ = g.Wait()
-
-	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(cause)
+	if err := selectAndCount(ctx, r.db, itemsQuerySql, itemsArgs, countQuerySql, countArgs, &items, &count); err != nil {
+		return nil, 0, err
 	}
 
 	return items, count, nil
@@ -282,7 +273,7 @@ func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]
 
 	countQuery := baseQuery.Columns("COUNT(*)")
 	itemsQuery := baseQuery.Columns("i.*").
-		OrderBy(fmt.Sprintf("i.%s %s", f.Column, f.Direction)).
+		OrderBy(safeOrderBy(f.Column, f.Direction, itemSortColumns, itemSortDefault)).
 		Offset(offset).
 		Limit(uint64(f.PageSize))
 
@@ -296,29 +287,8 @@ func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]
 		return nil, 0, toRepositoryError(err)
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		if err := r.db.SelectContext(ctx, &items, itemsQuerySql, itemsArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	_ = g.Wait()
-
-	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(cause)
+	if err := selectAndCount(ctx, r.db, itemsQuerySql, itemsArgs, countQuerySql, countArgs, &items, &count); err != nil {
+		return nil, 0, err
 	}
 
 	return items, count, nil
@@ -339,10 +309,11 @@ func (r *ItemRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 }
 
 func (r *ItemRepo) UpdateUrlContentTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item) error {
-	sql, args, err := r.queryBuilder.
+	query, args, err := r.queryBuilder.
 		Update("items").
 		Set("url_metadata", item.UrlMetadata).
 		Set("extracted_content", item.ExtractedContent).
+		Set("url_status", string(domain.UrlStatusReady)).
 		Set("updated_at", time.Now()).
 		Where(sq.Eq{"id": item.ID}).
 		ToSql()
@@ -350,7 +321,22 @@ func (r *ItemRepo) UpdateUrlContentTx(ctx context.Context, tx *sqlx.Tx, item *do
 		return toRepositoryError(err)
 	}
 
-	_, err = tx.ExecContext(ctx, sql, args...)
+	_, err = tx.ExecContext(ctx, query, args...)
+	return toRepositoryError(err)
+}
+
+func (r *ItemRepo) SetUrlStatusTx(ctx context.Context, tx *sqlx.Tx, itemID, status string) error {
+	query, args, err := r.queryBuilder.
+		Update("items").
+		Set("url_status", status).
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"id": itemID}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = tx.ExecContext(ctx, query, args...)
 	return toRepositoryError(err)
 }
 

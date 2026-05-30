@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"qvarkk/kvault/internal/domain"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,9 +14,13 @@ type UserService interface {
 
 func AuthRequired(userService UserService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		api_key := ctx.GetHeader("Authorization")
+		apiKey := strings.TrimSpace(ctx.GetHeader("Authorization"))
+		// Accept both a bare key and the conventional "Bearer <key>" form.
+		if after, ok := cutBearerPrefix(apiKey); ok {
+			apiKey = strings.TrimSpace(after)
+		}
 
-		user, err := userService.Authenticate(ctx.Request.Context(), api_key)
+		user, err := userService.Authenticate(ctx.Request.Context(), apiKey)
 		if err != nil {
 			ctx.Error(err)
 			ctx.Abort()
@@ -25,4 +30,13 @@ func AuthRequired(userService UserService) gin.HandlerFunc {
 		ctx.Set("userID", user.ID)
 		ctx.Next()
 	}
+}
+
+// cutBearerPrefix strips a case-insensitive "Bearer " scheme prefix if present.
+func cutBearerPrefix(s string) (string, bool) {
+	const prefix = "bearer "
+	if len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix) {
+		return s[len(prefix):], true
+	}
+	return s, false
 }

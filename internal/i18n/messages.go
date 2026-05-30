@@ -96,6 +96,16 @@ var messages = map[string]map[string]string{
 		LocaleRU: "Недостаточно контента для генерации указанного количества тегов.",
 		LocaleJA: "要求されたタグ数を生成するコンテンツが不足しています。",
 	},
+	"err.url_required": {
+		LocaleEN: "A source URL is required for url-type items.",
+		LocaleRU: "Для элементов типа «url» требуется исходный URL.",
+		LocaleJA: "URLタイプのアイテムにはソースURLが必要です。",
+	},
+	"err.rate_limited": {
+		LocaleEN: "Too many requests. Please slow down and try again later.",
+		LocaleRU: "Слишком много запросов. Пожалуйста, повторите попытку позже.",
+		LocaleJA: "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+	},
 }
 
 func Translate(key, locale string) string {

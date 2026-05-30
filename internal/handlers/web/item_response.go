@@ -14,6 +14,7 @@ type ItemResponse struct {
 	Title            string          `json:"title"`
 	Content          string          `json:"content"`
 	SourceURL        string          `json:"source_url,omitempty"`
+	UrlStatus        string          `json:"url_status,omitempty"`
 	UrlMetadata      *UrlMetadataDTO `json:"url_metadata,omitempty"`
 	ExtractedContent string          `json:"extracted_content,omitempty"`
 	CreatedAt        string          `json:"created_at"`
@@ -41,6 +42,7 @@ func toItemResponse(item *domain.Item) ItemResponse {
 		Title:     item.Title,
 		Content:   item.Content.String,
 		SourceURL: item.SourceURL.String,
+		UrlStatus: item.UrlStatus.String,
 		CreatedAt: item.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: item.UpdatedAt.Format(time.RFC3339),
 		Tags:      tags,

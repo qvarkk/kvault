@@ -83,7 +83,7 @@ func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.
 		return "", err
 	}
 
-	rawText := buf.String()
+	rawText := stripNullBytes(buf.String())
 	words := strings.Fields(rawText)
 	normalizedText := strings.Join(words, " ")
 	return normalizedText, nil

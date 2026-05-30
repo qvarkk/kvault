@@ -2,15 +2,22 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 	"qvarkk/kvault/internal/domain"
 	"strings"
 	"unicode"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/sync/errgroup"
 )
+
+// fileSortColumns whitelists sortable columns for files.
+var fileSortColumns = map[string]string{
+	"original_name": "original_name",
+	"size":          "size",
+	"created_at":    "created_at",
+}
+
+const fileSortDefault = "created_at"
 
 type FileRepo struct {
 	db           *sqlx.DB
@@ -62,14 +69,12 @@ func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]do
 		baseQuery = baseQuery.Where(sq.Eq{"mime_type": params.MimeType})
 	}
 
-	// TODO: unify orderby with handler somehow, sql injection possible
-	// TODO: refactor repetition in ItemsRepo.List
 	filesQuery := baseQuery.Columns("*")
 	if tsQuery != "" {
 		filesQuery = filesQuery.OrderByClause(sq.Expr("ts_rank(search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
 	}
 	filesQuery = filesQuery.
-		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		OrderBy(safeOrderBy(params.Column, params.Direction, fileSortColumns, fileSortDefault)).
 		Offset(offset).
 		Limit(uint64(params.PageSize))
 	countQuery := baseQuery.Columns("COUNT(*)")
@@ -84,29 +89,8 @@ func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]do
 		return nil, 0, toRepositoryError(err)
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		if err := r.db.SelectContext(ctx, &files, filesQuerySql, filesArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	_ = g.Wait()
-
-	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(cause)
+	if err := selectAndCount(ctx, r.db, filesQuerySql, filesArgs, countQuerySql, countArgs, &files, &count); err != nil {
+		return nil, 0, err
 	}
 
 	return files, count, nil
@@ -225,7 +209,7 @@ func (r *FileRepo) ListDeleted(ctx context.Context, params domain.ListFileFilter
 
 	countQuery := baseQuery.Columns("COUNT(*)")
 	filesQuery := baseQuery.Columns("*").
-		OrderBy(fmt.Sprintf("%s %s", params.Column, params.Direction)).
+		OrderBy(safeOrderBy(params.Column, params.Direction, fileSortColumns, fileSortDefault)).
 		Offset(offset).
 		Limit(uint64(params.PageSize))
 
@@ -239,29 +223,8 @@ func (r *FileRepo) ListDeleted(ctx context.Context, params domain.ListFileFilter
 		return nil, 0, toRepositoryError(err)
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		if err := r.db.SelectContext(ctx, &files, filesQuerySql, filesArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := r.db.GetContext(ctx, &count, countQuerySql, countArgs...); err != nil {
-			cancel(err)
-			return err
-		}
-		return nil
-	})
-
-	_ = g.Wait()
-
-	if cause := context.Cause(ctx); cause != nil {
-		return nil, 0, toRepositoryError(cause)
+	if err := selectAndCount(ctx, r.db, filesQuerySql, filesArgs, countQuerySql, countArgs, &files, &count); err != nil {
+		return nil, 0, err
 	}
 
 	return files, count, nil
@@ -287,6 +250,21 @@ func (r *FileRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 		Delete("files").
 		Where(sq.Eq{"user_id": userID}).
 		Where(sq.NotEq{"deleted_at": nil}).
+		ToSql()
+	if err != nil {
+		return toRepositoryError(err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sql, args...)
+	return toRepositoryError(err)
+}
+
+// HardDeleteByID unconditionally deletes a file row (ignores soft-delete state).
+// Used to compensate a failed upload so no orphan record is left behind.
+func (r *FileRepo) HardDeleteByID(ctx context.Context, fileID string) error {
+	sql, args, err := r.queryBuilder.
+		Delete("files").
+		Where(sq.Eq{"id": fileID}).
 		ToSql()
 	if err != nil {
 		return toRepositoryError(err)

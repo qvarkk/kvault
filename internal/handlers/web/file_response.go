@@ -13,6 +13,7 @@ type FileResponse struct {
 	MimeType     string `json:"mime_type"`
 	Status       string `json:"status"`
 	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 func toFileResponse(file *domain.File) FileResponse {
@@ -24,5 +25,6 @@ func toFileResponse(file *domain.File) FileResponse {
 		MimeType:     file.MimeType,
 		Status:       string(file.Status),
 		CreatedAt:    file.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    file.UpdatedAt.Format(time.RFC3339),
 	}
 }

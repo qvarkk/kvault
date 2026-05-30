@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 type ItemRepo interface {
@@ -18,6 +19,7 @@ type ItemRepo interface {
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Item) error
 	UpdateUrlContentTx(context.Context, *sqlx.Tx, *domain.Item) error
+	SetUrlStatusTx(ctx context.Context, tx *sqlx.Tx, itemID, status string) error
 	SoftDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 	RestoreByIDTx(context.Context, *sqlx.Tx, string) error
 	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
@@ -88,7 +90,15 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	invalidateListCache(ctx, s.cache, itemListVersionKey(input.UserID))
 
 	if item.Type == domain.ItemTypeUrl && item.SourceURL.Valid {
-		_ = s.enqueuer.EnqueueUrlFetch(ctx, input.UserID, item.ID)
+		if err := s.enqueuer.EnqueueUrlFetch(ctx, input.UserID, item.ID); err != nil {
+			// The item is created and left in "pending"; surface the failure so it
+			// isn't silently never-fetched. The user can re-trigger via /refetch.
+			zap.L().Error("failed to enqueue url fetch",
+				zap.String("item_id", item.ID),
+				zap.String("user_id", input.UserID),
+				zap.Error(err),
+			)
+		}
 	}
 
 	return item, nil
@@ -313,9 +323,7 @@ func (s *ItemService) Autotag(ctx context.Context, itemID, userID string, count 
 		return nil, NewServiceError(ErrItemNotFound, "forbidden", nil)
 	}
 
-	totalChars := len(item.Title) + len(item.Content.String)
-	requiredChars := 5 * 10 * count
-	if totalChars < requiredChars {
+	if !meetsAutotagContentThreshold(item, count) {
 		return nil, NewServiceError(ErrInsufficientContent, "not enough content", nil)
 	}
 
@@ -325,6 +333,8 @@ func (s *ItemService) Autotag(ctx context.Context, itemID, userID string, count 
 
 	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
 	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
+	// Autotag can create new tags, so the tag list cache must be busted too.
+	invalidateListCache(ctx, s.cache, tagListVersionKey(userID))
 
 	tags, err := s.tagRepo.FindByItemID(ctx, itemID)
 	if err != nil {
@@ -385,7 +395,30 @@ func (s *ItemService) RefetchUrl(ctx context.Context, itemID, userID string) err
 		return NewServiceError(ErrInternal, "item is not a url type", nil)
 	}
 
+	// Flip back to "pending" so the UI immediately reflects an in-flight refetch.
+	err = s.transactor.WithTx(ctx, func(tx *sqlx.Tx) error {
+		return s.itemRepo.SetUrlStatusTx(ctx, tx, itemID, string(domain.UrlStatusPending))
+	})
+	if err != nil {
+		return NewServiceError(ErrInternal, "failed to reset url status", err)
+	}
+
+	invalidateSingleCache(ctx, s.cache, itemKey(itemID))
+	invalidateListCache(ctx, s.cache, itemListVersionKey(userID))
+
 	return s.enqueuer.EnqueueUrlFetch(ctx, userID, itemID)
+}
+
+// autotagCharsPerTag is the minimum content length (title + body + extracted
+// text) required per requested tag before autotag will run.
+const autotagCharsPerTag = 5 * 10
+
+// meetsAutotagContentThreshold reports whether an item has enough textual
+// content to justify generating `count` tags. URL items keep their body in
+// ExtractedContent, so it must be counted alongside Title and Content.
+func meetsAutotagContentThreshold(item *domain.Item, count int) bool {
+	totalChars := len(item.Title) + len(item.Content.String) + len(item.ExtractedContent.String)
+	return totalChars >= autotagCharsPerTag*count
 }
 
 func itemKey(itemID string) string {

@@ -115,6 +115,14 @@ var serviceErrorRules = []mappingRule{
 			Message: "Not enough content to generate the requested number of tags.",
 		},
 	},
+	{
+		target: services.ErrUrlRequired,
+		public: &PublicError{
+			Err:     ErrUnprocessableEntity,
+			Key:     "err.url_required",
+			Message: "A source URL is required for url-type items.",
+		},
+	},
 }
 
 // Does not map errors that cause internal errors.

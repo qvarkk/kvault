@@ -2,17 +2,16 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 )
 
-var (
-	UserFieldID     = "id"
+const (
+	UserFieldID       = "id"
 	UserFieldUsername = "username"
-	UserFieldApiKey = "api_key"
+	UserFieldApiKey   = "api_key_hash"
 )
 
 type UserRepo struct {
@@ -31,8 +30,8 @@ func NewUserRepo(db *sqlx.DB) *UserRepo {
 
 func (r *UserRepo) CreateNew(ctx context.Context, user *domain.User) error {
 	sql, args, err := r.queryBuilder.
-		Insert("users").Columns("username", "password", "api_key").
-		Values(user.Username, user.Password, user.APIKey).
+		Insert("users").Columns("username", "password", "api_key_hash").
+		Values(user.Username, user.Password, user.APIKeyHash).
 		Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return toRepositoryError(err)
@@ -42,23 +41,20 @@ func (r *UserRepo) CreateNew(ctx context.Context, user *domain.User) error {
 	return toRepositoryError(err)
 }
 
-func (r *UserRepo) IsApiKeyUnique(ctx context.Context, apiKey string) (bool, error) {
-	sql, args, err := r.queryBuilder.
-		Select("1").From("users").
-		Where(sq.Eq{"api_key": apiKey}).
-		Limit(1).ToSql()
+func (r *UserRepo) IsApiKeyUnique(ctx context.Context, apiKeyHash string) (bool, error) {
+	sql, _, err := r.queryBuilder.
+		Select("EXISTS(SELECT 1 FROM users WHERE api_key_hash = ?)").
+		ToSql()
 	if err != nil {
 		return false, toRepositoryError(err)
 	}
 
 	var exists bool
-	err = r.db.Get(&exists, sql, args...)
-	err = toRepositoryError(err)
-	if errors.Is(err, ErrNotFound) {
-		return true, nil
+	if err := r.db.GetContext(ctx, &exists, sql, apiKeyHash); err != nil {
+		return false, toRepositoryError(err)
 	}
 
-	return false, err
+	return !exists, nil
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, userID string) (*domain.User, error) {
@@ -69,14 +65,14 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.
 	return r.getByField(ctx, UserFieldUsername, username)
 }
 
-func (r *UserRepo) GetByApiKey(ctx context.Context, apiKey string) (*domain.User, error) {
-	return r.getByField(ctx, UserFieldApiKey, apiKey)
+func (r *UserRepo) GetByApiKeyHash(ctx context.Context, apiKeyHash string) (*domain.User, error) {
+	return r.getByField(ctx, UserFieldApiKey, apiKeyHash)
 }
 
-// Updates API key and returns updated user
-func (r *UserRepo) UpdateApiKey(ctx context.Context, userID string, apiKey string) (*domain.User, error) {
+// Updates the API key hash and returns the updated user
+func (r *UserRepo) UpdateApiKey(ctx context.Context, userID string, apiKeyHash string) (*domain.User, error) {
 	sql, args, err := r.queryBuilder.
-		Update("users").Set("api_key", apiKey).Set("updated_at", "now()").
+		Update("users").Set("api_key_hash", apiKeyHash).Set("updated_at", "now()").
 		Where(sq.Eq{"id": userID}).Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return nil, toRepositoryError(err)

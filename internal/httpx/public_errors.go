@@ -15,6 +15,7 @@ var (
 	ErrForbidden           = errors.New("Access to the requested entity is forbidden.")
 	ErrNotFound            = errors.New("The requested resource was not found.")
 	ErrUnprocessableEntity = errors.New("The request could not be processed. Please check your input.")
+	ErrTooManyRequests     = errors.New("Too many requests. Please try again later.")
 	ErrInternalServer      = errors.New("An internal server error occurred.")
 )
 
@@ -24,6 +25,7 @@ var errorStatusMap = map[error]int{
 	ErrForbidden:           http.StatusForbidden,
 	ErrNotFound:            http.StatusNotFound,
 	ErrUnprocessableEntity: http.StatusUnprocessableEntity,
+	ErrTooManyRequests:     http.StatusTooManyRequests,
 	ErrInternalServer:      http.StatusInternalServerError,
 }
 

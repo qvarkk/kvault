@@ -33,6 +33,7 @@ type FileHandler interface {
 	ListDeleted(*gin.Context) error
 	Download(*gin.Context) error
 	GetViewURL(*gin.Context) error
+	GetInfo(*gin.Context) error
 	Delete(*gin.Context) error
 	Restore(*gin.Context) error
 	PermanentlyDelete(*gin.Context) error
