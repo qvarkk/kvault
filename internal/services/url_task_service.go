@@ -170,7 +170,10 @@ func (s *UrlTaskService) fetchURL(rawURL string) (UrlMetadata, string, error) {
 	meta.Image = doc.Find(`meta[property="og:image"]`).AttrOr("content", "")
 	meta.SiteName = doc.Find(`meta[property="og:site_name"]`).AttrOr("content", "")
 
-	// Extract body text: <article> > <main> > <body>
+	return meta, extractMainText(doc), nil
+}
+
+func extractMainText(doc *goquery.Document) string {
 	var textNode *goquery.Selection
 	if a := doc.Find("article"); a.Length() > 0 {
 		textNode = a.First()
@@ -182,17 +185,13 @@ func (s *UrlTaskService) fetchURL(rawURL string) (UrlMetadata, string, error) {
 
 	textNode.Find("script, style, noscript").Remove()
 
-	// goquery's .Text() concatenates adjacent elements with no separator
-	// (e.g. "<p>foo</p><p>bar</p>" -> "foobar"), which fuses distinct words and
-	// hurts search. Collect text node-by-node with spaces between them instead.
+	// goquery's .Text() fuses adjacent elements ("<p>foo</p><p>bar</p>" -> "foobar");
+	// nodeText inserts spaces so distinct words stay separated.
 	var rawText string
 	if len(textNode.Nodes) > 0 {
 		rawText = nodeText(textNode.Nodes[0])
 	}
-	words := strings.Fields(stripNullBytes(rawText))
-	extractedText := strings.Join(words, " ")
-
-	return meta, extractedText, nil
+	return strings.Join(strings.Fields(stripNullBytes(rawText)), " ")
 }
 
 // nodeText gathers all descendant text, appending a space after each text node
