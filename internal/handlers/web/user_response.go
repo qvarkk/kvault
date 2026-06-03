@@ -24,8 +24,8 @@ func toUserResponse(user *domain.User) UserResponse {
 }
 
 // toUserResponseWithApiKey includes the freshly issued plaintext key. Used only
-// by register, login (rotate-on-login), and refresh — never by /me — because the
-// key is stored hashed and cannot be recovered afterwards.
+// by register and login (each issues a new per-device key) — never by /me —
+// because the key is stored hashed and cannot be recovered afterwards.
 func toUserResponseWithApiKey(user *domain.User, apiKey string) UserResponse {
 	resp := toUserResponse(user)
 	resp.APIKey = apiKey

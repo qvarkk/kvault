@@ -60,9 +60,14 @@ func registerAuthRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h AuthHandle
 
 	protected := group.Group("/", auth)
 	protected.GET("/me", web.APIWrap(h.GetAuthenticatedUser))
-	protected.POST("/refresh", web.APIWrap(h.RotateApiKey))
 	protected.PATCH("/me/password", web.APIWrap(h.ChangePassword))
 	protected.POST("/me/delete", web.APIWrap(h.DeleteAccount))
+
+	protected.GET("/keys", web.APIWrap(h.ListKeys))
+	protected.PATCH("/keys/:id", web.APIWrap(h.RenameKey))
+	protected.DELETE("/keys/:id", web.APIWrap(h.DeleteKey))
+	protected.POST("/logout", web.APIWrap(h.Logout))
+	protected.POST("/logout-others", web.APIWrap(h.LogoutOthers))
 }
 
 func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandler) {

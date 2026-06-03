@@ -16,6 +16,7 @@ type Config struct {
 	Cache  CacheConfig
 	Aws    AwsConfig
 	Worker WorkerConfig
+	Auth   AuthConfig
 }
 
 type ApiConfig struct {
@@ -60,7 +61,13 @@ type AwsConfig struct {
 }
 
 type WorkerConfig struct {
-	ConcurrentTasks int `default:"10"`
+	ConcurrentTasks int           `default:"10"`
+	MaxRetries      int           `default:"3" envconfig:"MAX_RETRIES"`
+	RetryTimeout    time.Duration `default:"5m" envconfig:"RETRY_TIMEOUT"`
+}
+
+type AuthConfig struct {
+	ApiKeyTtl time.Duration `default:"720h" envconfig:"API_KEY_TTL"`
 }
 
 func LoadConfig() (*Config, error) {

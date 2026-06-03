@@ -58,7 +58,7 @@ func main() {
 	queueConfig := redisConnConfig
 	queueConfig.DB = config.Redis.QueueDb
 
-	enqueuer, err := redis.NewAsynqEnqueuer(queueConfig)
+	enqueuer, err := redis.NewAsynqEnqueuer(queueConfig, config.Worker.MaxRetries, config.Worker.RetryTimeout)
 	if err != nil {
 		zap.L().Fatal("Asynq connection to Redis failed", zap.Error(err))
 	}
@@ -91,6 +91,7 @@ func main() {
 
 	var (
 		userRepo     = repositories.NewUserRepo(pg.DB)
+		apiKeyRepo   = repositories.NewApiKeyRepo(pg.DB)
 		itemRepo     = repositories.NewItemRepo(pg.DB)
 		fileRepo     = repositories.NewFileRepo(pg.DB)
 		stopwordRepo = repositories.NewStopwordRepo(pg.DB)
@@ -99,8 +100,8 @@ func main() {
 	)
 
 	var (
-		authService     = services.NewAuthService(userRepo)
-		userService     = services.NewUserService(userRepo)
+		authService     = services.NewAuthService(userRepo, apiKeyRepo, config.Auth.ApiKeyTtl)
+		userService     = services.NewUserService(userRepo, apiKeyRepo, config.Auth.ApiKeyTtl)
 		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, enqueuer, cacheConfig.ItemsTtl)
 		fileService     = services.NewFileService(fileRepo, transactor, enqueuer, aws, cacheStore, cacheConfig.FilesTtl)
 		stopwordService = services.NewStopwordService(stopwordRepo, transactor, cacheStore, cacheConfig.StopwordsTtl)

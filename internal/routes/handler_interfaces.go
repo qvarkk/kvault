@@ -6,9 +6,13 @@ type AuthHandler interface {
 	RegisterUser(*gin.Context) error
 	AuthenticateUser(*gin.Context) error
 	GetAuthenticatedUser(*gin.Context) error
-	RotateApiKey(*gin.Context) error
 	ChangePassword(*gin.Context) error
 	DeleteAccount(*gin.Context) error
+	ListKeys(*gin.Context) error
+	RenameKey(*gin.Context) error
+	DeleteKey(*gin.Context) error
+	Logout(*gin.Context) error
+	LogoutOthers(*gin.Context) error
 }
 
 type ItemHandler interface {

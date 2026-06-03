@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"qvarkk/kvault/internal/tasks"
+	"time"
 
 	"github.com/hibiken/asynq"
 )
 
 type AsynqEnqueuer struct {
-	client *asynq.Client
+	client     *asynq.Client
+	maxRetries int
+	timeout    time.Duration
 }
 
-func NewAsynqEnqueuer(config ConnConfig) (*AsynqEnqueuer, error) {
+func NewAsynqEnqueuer(config ConnConfig, maxRetries int, timeout time.Duration) (*AsynqEnqueuer, error) {
 	asynqOpt := asynq.RedisClientOpt{
 		Addr:     config.Addr,
 		Username: config.Username,
@@ -28,8 +31,17 @@ func NewAsynqEnqueuer(config ConnConfig) (*AsynqEnqueuer, error) {
 	}
 
 	return &AsynqEnqueuer{
-		client: client,
+		client:     client,
+		maxRetries: maxRetries,
+		timeout:    timeout,
 	}, nil
+}
+
+func (e *AsynqEnqueuer) opts() []asynq.Option {
+	return []asynq.Option{
+		asynq.MaxRetry(e.maxRetries),
+		asynq.Timeout(e.timeout),
+	}
 }
 
 func (e *AsynqEnqueuer) EnqueuePdfProcess(ctx context.Context, userID, fileID string) error {
@@ -43,7 +55,7 @@ func (e *AsynqEnqueuer) EnqueuePdfProcess(ctx context.Context, userID, fileID st
 		return err
 	}
 
-	_, err = e.client.EnqueueContext(ctx, task)
+	_, err = e.client.EnqueueContext(ctx, task, e.opts()...)
 	return err
 }
 
@@ -58,6 +70,6 @@ func (e *AsynqEnqueuer) EnqueueUrlFetch(ctx context.Context, userID, itemID stri
 		return err
 	}
 
-	_, err = e.client.EnqueueContext(ctx, task)
+	_, err = e.client.EnqueueContext(ctx, task, e.opts()...)
 	return err
 }

@@ -26,7 +26,7 @@ kvault распространяется как набор Docker-образов 
 
 - Сервер (VPS или физическая машина) с **Docker** и **Docker Compose**.
 - Открытые наружу порты (минимум — порт фронтенда, по умолчанию `80`).
-- *Опционально, но рекомендуется:* доменное имя и реверс-прокси (nginx, Caddy, Traefik) для HTTPS.
+- _Опционально, но рекомендуется:_ доменное имя и реверс-прокси (nginx, Caddy, Traefik) для HTTPS.
 
 ---
 
@@ -57,11 +57,11 @@ curl -o docker/garage/garage.toml    https://gitverse.ru/api/repos/qvarkk/kvault
 
 Откройте `.env` и **обязательно** измените перед запуском в продакшене:
 
-| Переменная | Зачем менять |
-| --- | --- |
-| `DB_PASSWORD` | Пароль базы данных — задайте надёжный. |
-| `REDIS_PASSWORD` | Пароль Redis — задайте надёжный. |
-| `API_CORS_ORIGINS` | Публичный адрес, по которому будет открываться kvault (см. ниже). |
+| Переменная                | Зачем менять                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `DB_PASSWORD`             | Пароль базы данных — задайте надёжный.                                                          |
+| `REDIS_PASSWORD`          | Пароль Redis — задайте надёжный.                                                                |
+| `API_CORS_ORIGINS`        | Публичный адрес, по которому будет открываться kvault (см. ниже).                               |
 | `AWS_PUBLIC_ENDPOINT_URL` | Публичный адрес хранилища файлов (см. [presigned-ссылки](#загрузка-файлов-и-presigned-ссылки)). |
 
 Ключи доступа к хранилищу (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) вы заполните позже — на [шаге 4](#шаг-4-настройка-хранилища-garage-s3), после генерации их в Garage.
@@ -204,23 +204,7 @@ Certbot сам пропишет TLS-сертификат и редирект с 
 
 > **Не забудьте про `API_CORS_ORIGINS`.** Значение должно **точно** совпадать со схемой и хостом, по которым открывается сайт. Если перешли на HTTPS — укажите `https://kvault.example.com`. Несовпадение приведёт к ошибкам CORS в браузере.
 
-<details>
-<summary>Альтернатива: Caddy (HTTPS из коробки)</summary>
-
-`Caddyfile`:
-
-```caddy
-kvault.example.com {
-    reverse_proxy localhost:8081
-    request_body {
-        max_size 100MB
-    }
-}
-```
-
-Caddy получит и автоматически продлит TLS-сертификат самостоятельно.
-
-</details>
+> **При переходе фронтенда на HTTPS, хранилище S3 тоже должно быть переведено на HTTPS для предотвращения mixed content.** См. пример ниже.
 
 ---
 
@@ -240,7 +224,71 @@ AWS_PUBLIC_ENDPOINT_URL=http://kvault.example.com:3900
 - `AWS_ENDPOINT_URL` (внутренний адрес, `http://garage:3900`) **менять не нужно** — по нему API общается с Garage внутри сети Docker.
 - Порт `GARAGE_S3_PORT` (по умолчанию `3900`) должен быть **открыт наружу** на сервере, чтобы браузеры могли скачивать файлы.
 
-> **Хотите спрятать порт `3900` за HTTPS?** Заведите для Garage отдельный поддомен (например, `s3.example.com`), проксируйте его на `localhost:3900` тем же способом, что и фронтенд, и тогда укажите `AWS_PUBLIC_ENDPOINT_URL=https://s3.example.com`. Не забудьте поднять `client_max_body_size`/лимит тела запроса в конфиге прокси.
+### S3 по HTTPS
+
+> **Почему это вообще нужно.** Если фронтенд открывается по **HTTPS**, а `AWS_PUBLIC_ENDPOINT_URL` указывает на **HTTP** (`http://194.0.2.10:3900`), браузер заблокирует переход по presigned-ссылке как **mixed content** — файлы перестанут скачиваться и загружаться.
+
+Самый простой способ перевести S3 на HTTPS без отдельного поддомена — проксировать Garage на **префиксе пути** того же домена, на котором уже работает фронтенд. Браузер ходит на `https://kvault.example.com/<бакет>/...`, nginx терминирует TLS и проксирует на локальный Garage.
+
+**1. В `.env`** укажите публичный адрес без порта (имя бакета попадёт в путь автоматически):
+
+```bash
+AWS_S3_BUCKET=kvault-bucket
+AWS_PUBLIC_ENDPOINT_URL=https://kvault.example.com
+```
+
+**2. В конфиге nginx** добавьте `location` для бакета в тот же `server`-блок на `443`, где проксируется фронтенд:
+
+```nginx
+# HTTP → HTTPS
+server {
+    # Автоматически сгенерировано certbot
+    listen 80;
+    server_name kvault.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name kvault.example.com;
+
+    # Автоматически сгенерировано certbot
+    ssl_certificate     /etc/letsencrypt/live/kvault.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kvault.example.com/privkey.pem;
+
+    # Файлы могут быть крупными — поднимаем лимит тела запроса
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://localhost:8081;          # контейнер фронтенда
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /kvault-bucket/ {
+        proxy_pass http://localhost:3900;           # локальный Garage S3
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Обязательно для chunked-загрузок в S3:
+        # иначе nginx буферизует тело и Garage отвергает запрос
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+```
+
+При этом:
+
+- Путь в `location` (`/kvault-bucket/`) должен **совпадать с именем бакета** `AWS_S3_BUCKET` — presigned-ссылка имеет вид `https://kvault.example.com/kvault-bucket/<ключ>?...`.
+- Порт `3900` **не нужно** открывать наружу: браузер ходит на `443`, а Garage слушает только локально.
+- `proxy_buffering off` / `proxy_request_buffering off` критичны для загрузки файлов (chunked upload).
+
+Готовый пример конфига — в [`deploy/nginx.example.conf`](deploy/nginx.example.conf).
 
 ---
 
@@ -248,66 +296,74 @@ AWS_PUBLIC_ENDPOINT_URL=http://kvault.example.com:3900
 
 ### Общие
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `KVAULT_VERSION` | `main` | Версия для сборки: git-тег, ветка или коммит (напр. `v0.1.0`). |
-| `KVAULT_REPO` | gitverse | Репозиторий бэкенда. Переопределяйте, только если зеркалите код (напр. на GitHub). |
-| `KVAULT_FRONTEND_REPO` | gitverse | Репозиторий фронтенда. Аналогично. |
-| `DEBUG` | `false` | Режим отладки — в продакшене держите `false`. |
-| `API_PORT` | `6767` | Порт API **внутри** сети Docker. Наружу обычно не публикуется. |
-| `FRONTEND_PORT` | `80` | Порт фронтенда **на хосте**. Поменяйте при работе за реверс-прокси. |
-| `GARAGE_S3_PORT` | `3900` | Порт Garage S3 на хосте. Должен совпадать с портом в `AWS_PUBLIC_ENDPOINT_URL`. |
-| `API_CORS_ORIGINS` | `http://localhost` | Публичный адрес фронтенда. Несколько — через запятую: `http://a.com,https://a.com`. |
+| Переменная             | По умолчанию       | Описание                                                                            |
+| ---------------------- | ------------------ | ----------------------------------------------------------------------------------- |
+| `KVAULT_VERSION`       | `main`             | Версия для сборки: git-тег, ветка или коммит (напр. `v0.1.0`).                      |
+| `KVAULT_REPO`          | gitverse           | Репозиторий бэкенда. Переопределяйте, только если зеркалите код (напр. на GitHub).  |
+| `KVAULT_FRONTEND_REPO` | gitverse           | Репозиторий фронтенда. Аналогично.                                                  |
+| `DEBUG`                | `false`            | Режим отладки — в продакшене держите `false`.                                       |
+| `API_PORT`             | `6767`             | Порт API **внутри** сети Docker. Наружу обычно не публикуется.                      |
+| `FRONTEND_PORT`        | `80`               | Порт фронтенда **на хосте**. Поменяйте при работе за реверс-прокси.                 |
+| `GARAGE_S3_PORT`       | `3900`             | Порт Garage S3 на хосте. Должен совпадать с портом в `AWS_PUBLIC_ENDPOINT_URL`.     |
+| `API_CORS_ORIGINS`     | `http://localhost` | Публичный адрес фронтенда. Несколько — через запятую: `http://a.com,https://a.com`. |
 
 ### База данных (PostgreSQL)
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `DB_HOST` | `pg` | Хост БД (имя сервиса в Docker). |
-| `DB_PORT` | `5432` | Порт БД. |
-| `DB_DATABASE` | `kvault` | Имя базы. |
-| `DB_USERNAME` | `postgres` | Пользователь. |
-| `DB_PASSWORD` | `postgres` | **Смените на надёжный пароль.** |
+| Переменная    | По умолчанию | Описание                        |
+| ------------- | ------------ | ------------------------------- |
+| `DB_HOST`     | `pg`         | Хост БД (имя сервиса в Docker). |
+| `DB_PORT`     | `5432`       | Порт БД.                        |
+| `DB_DATABASE` | `kvault`     | Имя базы.                       |
+| `DB_USERNAME` | `postgres`   | Пользователь.                   |
+| `DB_PASSWORD` | `postgres`   | **Смените на надёжный пароль.** |
 
 ### Redis
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `REDIS_HOST` | `redis` | Хост Redis. |
-| `REDIS_PORT` | `6379` | Порт Redis. |
-| `REDIS_USER` | `redis` | Пользователь. |
-| `REDIS_PASSWORD` | `redis` | **Смените на надёжный пароль.** |
-| `REDIS_QUEUE_DB` | `0` | Номер БД Redis под очередь фоновых задач. |
-| `REDIS_CACHE_DB` | `1` | Номер БД Redis под кэш. |
+| Переменная       | По умолчанию | Описание                                  |
+| ---------------- | ------------ | ----------------------------------------- |
+| `REDIS_HOST`     | `redis`      | Хост Redis.                               |
+| `REDIS_PORT`     | `6379`       | Порт Redis.                               |
+| `REDIS_USER`     | `redis`      | Пользователь.                             |
+| `REDIS_PASSWORD` | `redis`      | **Смените на надёжный пароль.**           |
+| `REDIS_QUEUE_DB` | `0`          | Номер БД Redis под очередь фоновых задач. |
+| `REDIS_CACHE_DB` | `1`          | Номер БД Redis под кэш.                   |
 
 ### Кэш
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `CACHE_ENABLED` | `true` | Включить кэширование. |
-| `CACHE_ITEMS_TTL` | `5m` | Время жизни кэша заметок. |
-| `CACHE_FILES_TTL` | `10m` | Время жизни кэша файлов. |
-| `CACHE_TAGS_TTL` | `15m` | Время жизни кэша тегов. |
-| `CACHE_STOPWORDS_TTL` | `30m` | Время жизни кэша стоп-слов. |
+| Переменная            | По умолчанию | Описание                    |
+| --------------------- | ------------ | --------------------------- |
+| `CACHE_ENABLED`       | `true`       | Включить кэширование.       |
+| `CACHE_ITEMS_TTL`     | `5m`         | Время жизни кэша заметок.   |
+| `CACHE_FILES_TTL`     | `10m`        | Время жизни кэша файлов.    |
+| `CACHE_TAGS_TTL`      | `15m`        | Время жизни кэша тегов.     |
+| `CACHE_STOPWORDS_TTL` | `30m`        | Время жизни кэша стоп-слов. |
 
 ### Хранилище (Garage / S3)
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `AWS_ACCESS_KEY_ID` | — | Access Key из Garage (см. [шаг 4](#шаг-4-настройка-хранилища-garage-s3)). |
-| `AWS_SECRET_ACCESS_KEY` | — | Secret Key из Garage. |
-| `AWS_REGION` | `garage` | Регион — с Garage не менять. |
-| `AWS_ENDPOINT_URL` | `http://garage:3900` | **Внутренний** адрес S3 — не менять при использовании Garage. |
-| `AWS_S3_BUCKET` | `kvault-bucket` | Имя бакета. |
-| `AWS_URL_EXPIRATION` | `60s` | Срок жизни ссылки на скачивание. |
-| `AWS_VIEW_URL_EXPIRATION` | `24h` | Срок жизни ссылки на просмотр. |
-| `AWS_PUBLIC_ENDPOINT_URL` | `http://localhost:3900` | **Публичный** адрес S3 — встраивается в ссылки на файлы для браузера. |
+| Переменная                | По умолчанию            | Описание                                                                  |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------- |
+| `AWS_ACCESS_KEY_ID`       | —                       | Access Key из Garage (см. [шаг 4](#шаг-4-настройка-хранилища-garage-s3)). |
+| `AWS_SECRET_ACCESS_KEY`   | —                       | Secret Key из Garage.                                                     |
+| `AWS_REGION`              | `garage`                | Регион — с Garage не менять.                                              |
+| `AWS_ENDPOINT_URL`        | `http://garage:3900`    | **Внутренний** адрес S3 — не менять при использовании Garage.             |
+| `AWS_S3_BUCKET`           | `kvault-bucket`         | Имя бакета.                                                               |
+| `AWS_URL_EXPIRATION`      | `60s`                   | Срок жизни ссылки на скачивание.                                          |
+| `AWS_VIEW_URL_EXPIRATION` | `24h`                   | Срок жизни ссылки на просмотр.                                            |
+| `AWS_PUBLIC_ENDPOINT_URL` | `http://localhost:3900` | **Публичный** адрес S3 — встраивается в ссылки на файлы для браузера.     |
 
 ### Воркер
 
-| Переменная | По умолчанию | Описание |
-| --- | --- | --- |
-| `WORKER_CONCURRENT_TASKS` | `10` | Число одновременно обрабатываемых фоновых задач (извлечение текста из PDF и веб-страниц). |
+| Переменная                | По умолчанию | Описание                                                                                  |
+| ------------------------- | ------------ | ----------------------------------------------------------------------------------------- |
+| `WORKER_CONCURRENT_TASKS` | `10`         | Число одновременно обрабатываемых фоновых задач (извлечение текста из PDF и веб-страниц). |
+| `WORKER_MAX_RETRIES`      | `3`          | Максимум повторных попыток упавшей фоновой задачи.                                        |
+| `WORKER_RETRY_TIMEOUT`    | `5m`         | Дедлайн одной попытки; при превышении задача повторяется.                                 |
+
+### Аутентификация
+
+| Переменная         | По умолчанию | Описание                                                                                             |
+| ------------------ | ------------ | ---------------------------------------------------------------------------------------------------- |
+| `AUTH_API_KEY_TTL` | `720h`       | Срок жизни API-ключа. Окно скользящее: ключ истекает через это время после последнего использования. |
 
 ---
 

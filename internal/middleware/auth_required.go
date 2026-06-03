@@ -9,7 +9,7 @@ import (
 )
 
 type UserService interface {
-	Authenticate(context.Context, string) (*domain.User, error)
+	Authenticate(context.Context, string) (*domain.User, string, error)
 }
 
 func AuthRequired(userService UserService) gin.HandlerFunc {
@@ -20,7 +20,7 @@ func AuthRequired(userService UserService) gin.HandlerFunc {
 			apiKey = strings.TrimSpace(after)
 		}
 
-		user, err := userService.Authenticate(ctx.Request.Context(), apiKey)
+		user, apiKeyID, err := userService.Authenticate(ctx.Request.Context(), apiKey)
 		if err != nil {
 			ctx.Error(err)
 			ctx.Abort()
@@ -28,6 +28,7 @@ func AuthRequired(userService UserService) gin.HandlerFunc {
 		}
 
 		ctx.Set("userID", user.ID)
+		ctx.Set("apiKeyID", apiKeyID)
 		ctx.Next()
 	}
 }

@@ -10,12 +10,16 @@ import (
 )
 
 type AuthService interface {
-	RegisterNewUser(ctx context.Context, username string, password string) (*domain.User, string, error)
-	VerifyCredentials(ctx context.Context, username string, password string) (*domain.User, string, error)
-	RotateApiKey(ctx context.Context, userID string) (*domain.User, string, error)
+	RegisterNewUser(ctx context.Context, username string, password string, label string) (*domain.User, string, error)
+	VerifyCredentials(ctx context.Context, username string, password string, label string) (*domain.User, string, error)
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 	VerifyPassword(ctx context.Context, userID, password string) error
 	DeleteAccount(ctx context.Context, userID string) error
+	ListKeys(ctx context.Context, userID string) ([]domain.ApiKey, error)
+	RenameKey(ctx context.Context, userID, keyID, label string) error
+	DeleteKey(ctx context.Context, userID, keyID string) error
+	Logout(ctx context.Context, userID, keyID string) error
+	LogoutOthers(ctx context.Context, userID, keyID string) error
 }
 
 type AuthUserService interface {
@@ -76,7 +80,7 @@ func (h *AuthHandler) RegisterUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, apiKey, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Username, req.Password)
+	user, apiKey, err := h.authService.RegisterNewUser(ctx.Request.Context(), req.Username, req.Password, deviceLabel(ctx))
 	if err != nil {
 		return err
 	}
@@ -102,7 +106,7 @@ func (h *AuthHandler) AuthenticateUser(ctx *gin.Context) error {
 		return err
 	}
 
-	user, apiKey, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Username, req.Password)
+	user, apiKey, err := h.authService.VerifyCredentials(ctx.Request.Context(), req.Username, req.Password, deviceLabel(ctx))
 	if err != nil {
 		return err
 	}
@@ -129,27 +133,6 @@ func (h *AuthHandler) GetAuthenticatedUser(ctx *gin.Context) error {
 	}
 
 	ctx.JSON(http.StatusOK, toUserResponse(user))
-	return nil
-}
-
-// @Summary      Refresh API key
-// @Description  Refreshes authenticated user's API key
-// @Tags         Authentication
-// @Security     ApiKeyAuth
-// @Produce      json
-// @Success      200   {object}  UserResponse
-// @Failure      401   {object}  httpx.ErrorResponse
-// @Failure      500   {object}  httpx.ErrorResponse
-// @Router       /auth/refresh [post]
-func (h *AuthHandler) RotateApiKey(ctx *gin.Context) error {
-	userID := ctx.MustGet("userID").(string)
-
-	user, apiKey, err := h.authService.RotateApiKey(ctx.Request.Context(), userID)
-	if err != nil {
-		return err
-	}
-
-	ctx.JSON(http.StatusOK, toUserResponseWithApiKey(user, apiKey))
 	return nil
 }
 
@@ -212,6 +195,135 @@ func (h *AuthHandler) DeleteAccount(ctx *gin.Context) error {
 	}
 
 	if err := h.authService.DeleteAccount(ctx.Request.Context(), userID); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+type keyIDUri struct {
+	ID string `uri:"id" binding:"required,uuid"`
+}
+
+type renameKeyRequest struct {
+	Label string `json:"label" binding:"required,max=64"`
+}
+
+// @Summary      List API keys
+// @Description  Lists the authenticated user's active API keys (one per device)
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Produce      json
+// @Success      200   {array}   ApiKeyResponse
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/keys [get]
+func (h *AuthHandler) ListKeys(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+	currentKeyID := ctx.MustGet("apiKeyID").(string)
+
+	keys, err := h.authService.ListKeys(ctx.Request.Context(), userID)
+	if err != nil {
+		return err
+	}
+
+	ctx.JSON(http.StatusOK, toApiKeyResponses(keys, currentKeyID))
+	return nil
+}
+
+// @Summary      Rename an API key
+// @Description  Updates the label of one of the authenticated user's API keys
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Param        id   path string true "API key ID"
+// @Param        body body renameKeyRequest true "New label"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/keys/{id} [patch]
+func (h *AuthHandler) RenameKey(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri keyIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	var req renameKeyRequest
+	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+		return err
+	}
+
+	if err := h.authService.RenameKey(ctx.Request.Context(), userID, uri.ID, req.Label); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Delete an API key
+// @Description  Revokes one of the authenticated user's API keys, logging out that device
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Param        id path string true "API key ID"
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/keys/{id} [delete]
+func (h *AuthHandler) DeleteKey(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri keyIDUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	if err := h.authService.DeleteKey(ctx.Request.Context(), userID, uri.ID); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Log out
+// @Description  Revokes the API key used for the current request
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/logout [post]
+func (h *AuthHandler) Logout(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+	keyID := ctx.MustGet("apiKeyID").(string)
+
+	if err := h.authService.Logout(ctx.Request.Context(), userID, keyID); err != nil {
+		return err
+	}
+
+	ctx.Status(http.StatusNoContent)
+	return nil
+}
+
+// @Summary      Log out other devices
+// @Description  Revokes every API key except the one used for the current request
+// @Tags         Authentication
+// @Security     ApiKeyAuth
+// @Success      204
+// @Failure      401   {object}  httpx.ErrorResponse
+// @Failure      500   {object}  httpx.ErrorResponse
+// @Router       /auth/logout-others [post]
+func (h *AuthHandler) LogoutOthers(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+	keyID := ctx.MustGet("apiKeyID").(string)
+
+	if err := h.authService.LogoutOthers(ctx.Request.Context(), userID, keyID); err != nil {
 		return err
 	}
 

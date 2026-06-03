@@ -1,7 +1,7 @@
 services:
   frontend:
     build:
-      context: ${KVAULT_FRONTEND_REPO:-https://gitverse.ru/qvarkk/kvault-frontend.git}#${KVAULT_VERSION:-main}
+      context: ../kvault-frontend
     image: kvault-frontend
     ports:
       - "${FRONTEND_PORT:-80}:80"
@@ -14,7 +14,7 @@ services:
 
   api:
     build:
-      context: ${KVAULT_REPO:-https://gitverse.ru/qvarkk/kvault.git}#${KVAULT_VERSION:-main}
+      context: .
     image: kvault
     env_file: .env
     depends_on:

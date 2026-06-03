@@ -42,12 +42,21 @@ const (
 )
 
 type User struct {
+	ID        string    `db:"id"`
+	Username  string    `db:"username"`
+	Password  string    `db:"password"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type ApiKey struct {
 	ID         string    `db:"id"`
-	Username   string    `db:"username"`
-	Password   string    `db:"password"`
-	APIKeyHash string    `db:"api_key_hash"`
+	UserID     string    `db:"user_id"`
+	KeyHash    string    `db:"key_hash"`
+	Label      string    `db:"label"`
+	LastUsedAt time.Time `db:"last_used_at"`
 	CreatedAt  time.Time `db:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at"`
+	ExpiresAt  time.Time `db:"expires_at"`
 }
 
 type Item struct {

@@ -12,12 +12,13 @@ type FileResponse struct {
 	Size         int64  `json:"size"`
 	MimeType     string `json:"mime_type"`
 	Status       string `json:"status"`
+	TextContent  string `json:"text_content,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 }
 
 func toFileResponse(file *domain.File) FileResponse {
-	return FileResponse{
+	resp := FileResponse{
 		ID:           file.ID,
 		S3Key:        file.S3Key,
 		OriginalName: file.OriginalName,
@@ -27,4 +28,8 @@ func toFileResponse(file *domain.File) FileResponse {
 		CreatedAt:    file.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:    file.UpdatedAt.Format(time.RFC3339),
 	}
+	if file.TextContent.Valid {
+		resp.TextContent = file.TextContent.String
+	}
+	return resp
 }
