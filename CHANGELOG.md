@@ -5,6 +5,15 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект придерживается [семантического версионирования](https://semver.org/lang/ru/).
 
+## [0.3.1] - 2026-06-09
+
+Восстановление конфигурации развёртывания.
+
+### Исправлено
+
+- `docker-compose.yml` приведён к предыдущей версии: убраны случайно
+  закоммиченные локальные изменения.
+
 ## [0.3.0] - 2026-06-03
 
 Многоустройственные API-ключи со сроком жизни, настраиваемые повторы воркера и документация по HTTPS-доступу к хранилищу.
@@ -79,6 +88,7 @@
 - Веб-интерфейс: светлая/тёмная тема, локализация (RU/EN/JA), адаптивная вёрстка.
 - Развёртывание через Docker Compose.
 
+[0.3.1]: https://gitverse.ru/qvarkk/kvault/releases/tag/v0.3.1
 [0.3.0]: https://gitverse.ru/qvarkk/kvault/releases/tag/v0.3.0
 [0.2.0]: https://gitverse.ru/qvarkk/kvault/releases/tag/v0.2.0
 [0.1.0]: https://github.com/qvarkk/kvault/releases/tag/v0.1.0
