@@ -2,7 +2,7 @@
 
 **Самостоятельно хостируемая система управления знаниями.** Храните заметки, веб-страницы и PDF-документы в одном месте — с автоматической тегизацией и полнотекстовым поиском по всему содержимому.
 
-Этот репозиторий содержит **бэкенд** (REST API). Веб-интерфейс — в отдельном репозитории [kvault-frontend](https://gitverse.ru/qvarkk/kvault-frontend).
+Монорепозиторий: [`backend/`](./backend) — REST API (Go), [`frontend/`](./frontend) — веб-интерфейс (Vue 3). Оркестрация всего стека — `docker-compose.yml` в корне.
 
 ---
 
@@ -23,9 +23,9 @@
 | Документ                                   | Назначение                                                                    |
 | ------------------------------------------ | ----------------------------------------------------------------------------- |
 | [DOCUMENTATION.md](./DOCUMENTATION.md)     | Руководство пользователя: поиск, фильтры, теги, стоп-слова, рабочие сценарии. |
-| [HOSTING.md](./backend/HOSTING.md)         | Полное руководство по развёртыванию: `.env`, домен, реверс-прокси, HTTPS.     |
+| [HOSTING.md](./HOSTING.md)                 | Полное руководство по развёртыванию: `.env`, домен, реверс-прокси, HTTPS.     |
 | [SECURITY.md](./SECURITY.md)               | Модель безопасности и рекомендации по защите данных.                          |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)       | Как участвовать в разработке бэкенда.                                         |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)       | Как участвовать в разработке.                                                 |
 | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | Кодекс поведения участников.                                                  |
 
 ---
@@ -38,15 +38,15 @@
 mkdir kvault && cd kvault
 
 # Compose-файл и пример конфига
-curl -O https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker-compose.yml
-curl -O https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/.env.example
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example
 mv .env.example .env
 
 # Конфиги Redis и Garage
 mkdir -p docker/redis docker/garage
-curl -o docker/redis/redis.conf    https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/redis/redis.conf
-curl -o docker/redis/entrypoint.sh https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/redis/entrypoint.sh
-curl -o docker/garage/garage.toml  https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/garage/garage.toml
+curl -o docker/redis/redis.conf    https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
+curl -o docker/redis/entrypoint.sh https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/entrypoint.sh
+curl -o docker/garage/garage.toml  https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
 
 # Перед запуском смените в .env как минимум DB_PASSWORD и REDIS_PASSWORD
 # (сгенерировать пароль: openssl rand -hex 24)
@@ -93,10 +93,17 @@ docker compose up -d
 ```bash
 cp .env.example .env
 
+# Бэкенд (команды выполняются из backend/)
+cd backend
 make docker-up-infra   # поднять PostgreSQL, Redis, Garage
 make migrate-up        # применить миграции
 make run-api           # запустить API
 make run-worker        # запустить фоновый воркер
+
+# Фронтенд (в отдельном терминале)
+cd frontend
+npm install
+npm run dev            # dev-сервер Vite
 ```
 
 Интерактивный справочник API (Swagger) доступен по адресу `/swagger`. Подробнее — в [CONTRIBUTING.md](./CONTRIBUTING.md).
@@ -105,7 +112,8 @@ make run-worker        # запустить фоновый воркер
 
 ## Стек
 
-Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · sqlx + squirrel · Zap
+**Бэкенд:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · sqlx + squirrel · Zap
+**Фронтенд:** Vue 3 · TypeScript · Vite · Tailwind CSS
 
 ---
 

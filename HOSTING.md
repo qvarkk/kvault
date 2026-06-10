@@ -39,15 +39,15 @@ kvault распространяется как набор Docker-образов 
 mkdir kvault && cd kvault
 
 # Compose-файл и пример конфига
-curl -O https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker-compose.yml
-curl -O https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/.env.example
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example
 mv .env.example .env
 
 # Конфиги Redis и Garage
 mkdir -p docker/redis docker/garage
-curl -o docker/redis/redis.conf      https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/redis/redis.conf
-curl -o docker/redis/entrypoint.sh   https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/redis/entrypoint.sh
-curl -o docker/garage/garage.toml    https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/garage/garage.toml
+curl -o docker/redis/redis.conf      https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
+curl -o docker/redis/entrypoint.sh   https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/entrypoint.sh
+curl -o docker/garage/garage.toml    https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
 ```
 
 > **Образы собираются из исходников.** kvault не зависит от внешнего реестра образов — при первом запуске Docker сам скачивает исходный код из репозитория и собирает образы локально. Какую версию собирать, задаёт переменная `KVAULT_VERSION` в `.env` (любой git-тег, ветка или коммит; по умолчанию `main` — последняя версия). Подробнее — в разделе [Версии и обновление](#обновление-и-обслуживание).
@@ -86,6 +86,8 @@ docker compose up -d --build
 ```
 
 Флаг `--build` собирает образы из исходников (Docker скачает код из репозитория). Первая сборка занимает несколько минут — дальше образы кэшируются.
+
+> **Если вы клонировали репозиторий** (а не скачали отдельные файлы), `docker compose up -d --build` автоматически подхватит `docker-compose.override.yml` и соберёт образы из рабочей копии. Для сборки из git, как на сервере, укажите файл явно: `docker compose -f docker-compose.yml up -d --build`.
 
 Поднимутся все сервисы. Контейнер `migrate` один раз применит миграции базы данных и завершится — это нормально.
 
@@ -365,9 +367,8 @@ server {
 
 | Переменная             | По умолчанию       | Описание                                                                                                                                                                                                             |
 | ---------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KVAULT_VERSION`       | `main`             | Версия для сборки: git-тег, ветка или коммит (напр. `v0.1.0`).                                                                                                                                                       |
-| `KVAULT_REPO`          | gitverse           | Репозиторий бэкенда. Переопределяйте, только если зеркалите код (напр. на GitHub).                                                                                                                                   |
-| `KVAULT_FRONTEND_REPO` | gitverse           | Репозиторий фронтенда. Аналогично.                                                                                                                                                                                   |
+| `KVAULT_VERSION`       | `main`             | Версия для сборки: git-тег, ветка или коммит (напр. `v1.0.0`).                                                                                                                                                       |
+| `KVAULT_REPO`          | GitHub             | Репозиторий проекта (бэкенд и фронтенд). Переопределяйте, только если используете зеркало (напр. GitVerse).                                                                                                          |
 | `DEBUG`                | `false`            | Режим отладки — в продакшене держите `false`.                                                                                                                                                                        |
 | `API_PORT`             | `6767`             | Порт API **внутри** сети Docker. Наружу обычно не публикуется.                                                                                                                                                       |
 | `FRONTEND_PORT`        | `80`               | Порт фронтенда **на хосте**. Поменяйте при работе за реверс-прокси. Можно указать в форме `IP:порт`, чтобы слушать только на одном интерфейсе — напр. tailnet-адресе (см. [Tailscale](#доступ-через-tailscale-vpn)). |

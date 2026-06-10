@@ -76,25 +76,28 @@ swagger-install:
 	go install github.com/swaggo/swag/cmd/swag@latest
  
 # ── Docker ──
+# compose file lives at the monorepo root
+COMPOSE := cd .. && docker compose
+
 ## docker-up: Start docker containers
 docker-up:
-	docker-compose up -d
+	$(COMPOSE) up -d
 
 ## docker-up-infra: Start infrastructure only (pg, redis, garage) for local development
 docker-up-infra:
-	docker-compose up -d pg redis garage
+	$(COMPOSE) up -d pg redis garage
 
 ## docker-down: Stop docker containers
 docker-down:
-	docker-compose down
+	$(COMPOSE) down
 
 ## docker-logs: Follow docker logs
 docker-logs:
-	docker-compose logs -f
+	$(COMPOSE) logs -f
 
 ## docker-rebuild: Rebuild docker containers
 docker-rebuild:
-	docker-compose up -d --build
+	$(COMPOSE) up -d --build
  
 # ── Helpers ──
 ## help: Show help

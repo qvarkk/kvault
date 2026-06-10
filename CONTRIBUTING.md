@@ -1,16 +1,20 @@
-# Участие в разработке — Бэкенд (kvault)
+# Участие в разработке kvault
 
-Спасибо за интерес к kvault. Этот документ описывает работу над **бэкендом** (REST API на Go). Репозиторий фронтенда: [gitverse.ru/qvarkk/kvault-frontend](https://gitverse.ru/qvarkk/kvault-frontend).
+Спасибо за интерес к kvault. Монорепозиторий: бэкенд (REST API на Go) — в [`backend/`](./backend), фронтенд (Vue 3) — в [`frontend/`](./frontend).
 
 ## Стек
 
-Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq
+**Бэкенд:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq
+**Фронтенд:** Vue 3 · TypeScript · Vite · Tailwind CSS
 
 ## Локальное окружение
 
 ```bash
-# Скопировать и заполнить конфиг
+# Скопировать и заполнить конфиг (в корне репозитория)
 cp .env.example .env
+
+# Команды make выполняются из backend/
+cd backend
 
 # Поднять инфраструктуру (PostgreSQL, Redis, Garage)
 make docker-up-infra
@@ -21,6 +25,14 @@ make migrate-up
 # Запустить API и фоновый воркер (в отдельных терминалах)
 make run-api
 make run-worker
+```
+
+Фронтенд (в отдельном терминале):
+
+```bash
+cd frontend
+npm install
+npm run dev    # dev-сервер Vite
 ```
 
 ## Полезные команды

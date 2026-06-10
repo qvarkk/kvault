@@ -1,3 +1,6 @@
+# Локальная разработка: compose подхватывает этот файл автоматически
+# и собирает образы из рабочей копии вместо git.
+# Для сборки из git (как на сервере): docker compose -f docker-compose.yml up -d
 services:
   frontend:
     build:
