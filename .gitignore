@@ -1,9 +1,5 @@
 *.log
 .env
-.awsrc
 .vscode
 tmp
-bin
-docs
-cors.json
 CLAUDE.md
