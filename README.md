@@ -49,6 +49,7 @@ curl -o docker/redis/entrypoint.sh https://gitverse.ru/api/repos/qvarkk/kvault/r
 curl -o docker/garage/garage.toml  https://gitverse.ru/api/repos/qvarkk/kvault/raw/branch/main/docker/garage/garage.toml
 
 # Перед запуском смените в .env как минимум DB_PASSWORD и REDIS_PASSWORD
+# (сгенерировать пароль: openssl rand -hex 24)
 
 docker compose up -d --build
 ```
