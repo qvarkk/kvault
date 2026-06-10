@@ -1,94 +1,94 @@
 # Changelog
 
-Все значимые изменения проекта документируются в этом файле.
+All notable changes to this project are documented in this file.
 
-Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
-проект придерживается [семантического версионирования](https://semver.org/lang/ru/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.3.1] - 2026-06-09
 
-Стабилизация интерфейса.
+UI stabilization.
 
-### Изменено
+### Changed
 
-- Добавлены favicon для всех девайсов.
+- Added favicons for all devices.
 
-### Исправлено
+### Fixed
 
-- Просмотр извлечённого текста: очень длинный текст больше не подвешивает и не
-  роняет страницу, содержимое рендерится секциями по мере прокрутки.
-- Смена языка: пункты бокового меню, подсказки и выпадающие списки сортировки
-  (заметки, файлы, поиск) переключаются сразу, а не после первого взаимодействия
-  (метки больше не замораживались при инициализации/выборе).
+- Extracted text view: very long text no longer hangs or crashes the page;
+  content renders in sections as you scroll.
+- Language switching: sidebar items, tooltips, and sort dropdowns (notes,
+  files, search) update immediately instead of after the first interaction
+  (labels no longer froze at initialization/selection).
 
 ## [0.3.0] - 2026-06-03
 
-Синхронизация с обновлённым API, глобальный поиск и управление сеансами.
+Sync with the updated API, global search, and session management.
 
-### Добавлено
+### Added
 
-- Глобальный поиск: палитра быстрого поиска (как в Obsidian) с историей запросов
-  в localStorage и удалением отдельных записей; отдельная страница поиска с разделами
-  «Заметки» и «Файлы», сортировкой и фильтром по тегам для заметок. Открывается из
-  бокового меню или по `Ctrl/Cmd+K`.
-- Управление сеансами в разделе «Аккаунт»: список API-ключей с пометкой текущего
-  устройства, переименование, выход с отдельного устройства и со всех остальных.
-- Просмотр извлечённого текста для файлов (модалка «Подробнее»).
+- Global search: a quick-search palette (Obsidian-style) with query history
+  in localStorage and per-entry deletion; a dedicated search page with "Notes"
+  and "Files" sections, sorting, and tag filtering for notes. Opens from the
+  sidebar or via `Ctrl/Cmd+K`.
+- Session management in the "Account" section: a list of API keys with the
+  current device marked, renaming, logging out a single device or all others.
+- Extracted text view for files (the "Details" modal).
 
-### Изменено
+### Changed
 
-- Карточка заметки-ссылки: убрано дублирующее описание (остаётся в источнике),
-  показывается превью содержимого. Кнопка открытия ссылки получила иконку
-  внешней ссылки.
-- Версия в разделе «О проекте» обновлена до 0.3.0.
+- URL note card: removed the duplicated description (it stays in the source),
+  a content preview is shown instead. The open-link button got an external
+  link icon.
+- Version in the "About" section bumped to 0.3.0.
 
-### Исправлено
+### Fixed
 
-- Карточка файла больше не ломается при длинном имени файла.
-- Загрузка файлов работает на хостах по обычному HTTP (фолбэк для `crypto.randomUUID`).
+- The file card no longer breaks on long file names.
+- File uploads work on plain-HTTP hosts (fallback for `crypto.randomUUID`).
 
 ## [0.2.0] - 2026-05-30
 
-Синхронизация с API 0.2.0, улучшения UX и безопасности.
+Sync with API 0.2.0, UX and security improvements.
 
-### Безопасность
+### Security
 
-- API-ключ больше не отображается в интерфейсе (вкладка «Аккаунт», боковое меню).
+- The API key is no longer displayed in the UI ("Account" tab, sidebar).
 
-### Добавлено
+### Added
 
-- Меню «Подробнее» с модальными окнами метаданных для заметок и файлов.
-- Для заметок-ссылок: модалка источника (метаданные в виде front-matter + изображение) и модалка извлечённого текста.
-- Индикатор статуса загрузки URL (`pending`/`ready`/`error`) на карточках заметок.
+- A "Details" menu with metadata modals for notes and files.
+- For URL notes: a source modal (metadata as front-matter + image) and an extracted text modal.
+- URL fetch status indicator (`pending`/`ready`/`error`) on note cards.
 
-### Изменено
+### Changed
 
-- Вкладка «Аккаунт»: ключ скрыт; обновление ключа происходит без его показа.
-- Карточка файла: статус-бейдж убран и перенесён в «Подробнее» с понятными описаниями состояния обработки.
-- Ссылки на репозитории в разделе «О проекте» ведут на gitverse.
-- Синхронизация с API 0.2.0: ротация ключа при входе, `GET /auth/me` без ключа, поле `url_status`, эндпоинт `/files/:id/info`, заголовок `Bearer`.
+- "Account" tab: the key is hidden; key refresh happens without revealing it.
+- File card: the status badge removed and moved into "Details" with clear processing state descriptions.
+- Repository links in the "About" section point to gitverse.
+- Sync with API 0.2.0: key rotation on login, `GET /auth/me` without the key, the `url_status` field, the `/files/:id/info` endpoint, the `Bearer` header.
 
-### Исправлено
+### Fixed
 
-- Уведомления об ошибках больше не пустые: устойчивая обработка ошибок API и сети с понятными сообщениями.
+- Error notifications are no longer empty: robust API and network error handling with clear messages.
 
 ## [0.1.0] - 2026-05-28
 
-Первый публичный релиз.
+First public release.
 
-### Добавлено
+### Added
 
-- Текстовые заметки в Markdown, заметки по ссылке (URL) и загрузка PDF-файлов.
-- Полнотекстовый поиск по всему содержимому с префиксным поиском и ранжированием.
-- Автоматическая и ручная тегизация; управление тегами и стоп-словами (RU/EN).
-- Фильтрация по тегам, сортировка, пагинация.
-- Корзина с восстановлением и безвозвратным удалением.
-- Хранение файлов в S3-совместимом хранилище (Garage), доступ по presigned-ссылкам.
-- Аутентификация по API-ключу.
-- Веб-интерфейс: светлая/тёмная тема, локализация (RU/EN/JA), адаптивная вёрстка.
-- Развёртывание через Docker Compose.
+- Markdown text notes, URL notes, and PDF file uploads.
+- Full-text search across all content with prefix search and ranking.
+- Automatic and manual tagging; tag and stopword management (RU/EN).
+- Tag filtering, sorting, pagination.
+- Trash bin with restore and permanent deletion.
+- File storage in S3-compatible storage (Garage), access via presigned URLs.
+- API key authentication.
+- Web UI: light/dark theme, localization (RU/EN/JA), responsive layout.
+- Deployment via Docker Compose.
 
-[0.3.1]: https://gitverse.ru/qvarkk/kvault-frontend/releases/tag/v0.3.1
-[0.3.0]: https://gitverse.ru/qvarkk/kvault-frontend/releases/tag/v0.3.0
-[0.2.0]: https://gitverse.ru/qvarkk/kvault-frontend/releases/tag/v0.2.0
+[0.3.1]: https://github.com/qvarkk/kvault-frontend/releases/tag/v0.3.1
+[0.3.0]: https://github.com/qvarkk/kvault-frontend/releases/tag/v0.3.0
+[0.2.0]: https://github.com/qvarkk/kvault-frontend/releases/tag/v0.2.0
 [0.1.0]: https://github.com/qvarkk/kvault-frontend/releases/tag/v0.1.0

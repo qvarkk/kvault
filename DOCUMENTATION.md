@@ -1,297 +1,297 @@
-# Руководство пользователя kvault
+# kvault User Guide
 
-**kvault** — это личная система управления знаниями. Она хранит ваши заметки, веб-страницы и PDF-документы в одном месте, автоматически расставляет теги и позволяет мгновенно находить нужное с помощью полнотекстового поиска.
+**kvault** is a personal knowledge management system. It keeps your notes, web pages, and PDF documents in one place, tags them automatically, and lets you instantly find what you need with full-text search.
 
-Всё, что вы добавляете в kvault, становится доступным для поиска: текст заметок, содержимое сохранённых веб-страниц и текст из загруженных PDF-файлов.
+Everything you add to kvault becomes searchable: note text, the content of saved web pages, and text from uploaded PDF files.
 
 > [!WARNING]
-> **О приватности и безопасности — прочитайте до начала работы.**
+> **About privacy and security — read this before you start.**
 >
-> kvault — система для **личного самостоятельного хостинга**. Это означает:
+> kvault is a system for **personal self-hosting**. This means:
 >
-> - **Администратор сервера видит всё.** Владелец сервера, на котором запущен kvault, имеет полный доступ к вашим данным: содержимому заметок, загруженным файлам, тегам и даже вашему API-ключу. Данные хранятся **без шифрования**. Доверяйте свои данные только тому серверу, которым управляете вы сами или кому полностью доверяете.
-> - **API-ключи привязаны к устройству и истекают.** Каждый вход выдаёт свой ключ; ключ перестаёт действовать, если им не пользовались дольше срока неактивности (по умолчанию 30 дней). Если ключ попал к кому-то ещё (что маловероятно для личного, не выставленного в интернет сервера, но всё же), отзовите доступ в настройках учётной записи: удалите нужный ключ либо завершите сеансы на других устройствах.
-> - **Не выставляйте сервис в открытый интернет.** В kvault нет встроенной защиты от взлома. Держите сервер в закрытом контуре: используйте VPN, который пускает только ваши доверенные устройства, либо ограничьте доступ файрволом. См. [SECURITY.md](./SECURITY.md).
+> - **The server administrator sees everything.** The owner of the server running kvault has full access to your data: note content, uploaded files, tags, and even your API key. Data is stored **without encryption**. Only entrust your data to a server operated by you or by someone you fully trust.
+> - **API keys are per-device and expire.** Every login issues its own key; a key stops working if unused for longer than the inactivity period (30 days by default). If a key ends up in someone else's hands (unlikely for a personal, non-exposed server, but still), revoke access in the account settings: delete the specific key or end sessions on other devices.
+> - **Do not expose the service to the open internet.** kvault has no built-in protection against attacks. Keep the server in a closed perimeter: use a VPN that admits only your trusted devices, or restrict access with a firewall. See [SECURITY.md](./SECURITY.md).
 
 ---
 
-## Содержание
+## Contents
 
-- [Быстрый старт](#быстрый-старт)
-- [Регистрация и вход](#регистрация-и-вход)
-- [Заметки](#заметки)
-  - [Текстовые заметки](#текстовые-заметки)
-  - [Заметки по ссылке (URL)](#заметки-по-ссылке-url)
-- [Файлы](#файлы)
-- [Полнотекстовый поиск (FTS)](#полнотекстовый-поиск-fts)
-- [Фильтры и сортировка](#фильтры-и-сортировка)
-- [Теги](#теги)
-- [Стоп-слова и автотегирование](#стоп-слова-и-автотегирование)
-- [Корзина](#корзина)
-- [Язык и тема оформления](#язык-и-тема-оформления)
-- [Справочник по API (Swagger)](#справочник-по-api-swagger)
-
----
-
-## Быстрый старт
-
-Типичный сценарий работы с kvault:
-
-1. **Зарегистрируйтесь** и войдите в систему.
-2. **Добавьте знания** — создайте текстовую заметку, сохраните веб-страницу по ссылке или загрузите PDF-файл.
-3. kvault **автоматически проиндексирует** содержимое и **расставит теги**.
-4. **Найдите нужное** через поиск, отфильтруйте по тегам.
-5. При необходимости **управляйте тегами и стоп-словами**, чтобы автотегирование работало точнее.
+- [Quick start](#quick-start)
+- [Registration and login](#registration-and-login)
+- [Notes](#notes)
+  - [Text notes](#text-notes)
+  - [URL notes](#url-notes)
+- [Files](#files)
+- [Full-text search (FTS)](#full-text-search-fts)
+- [Filters and sorting](#filters-and-sorting)
+- [Tags](#tags)
+- [Stopwords and auto-tagging](#stopwords-and-auto-tagging)
+- [Trash bin](#trash-bin)
+- [Language and theme](#language-and-theme)
+- [API reference (Swagger)](#api-reference-swagger)
 
 ---
 
-## Регистрация и вход
+## Quick start
 
-1. На странице входа нажмите ссылку регистрации.
-2. Укажите **имя пользователя** (не короче 3 символов) и **пароль**.
-3. После регистрации вы автоматически входите в систему.
+A typical kvault workflow:
 
-> **Как устроена авторизация.** При каждом входе вам выдаётся отдельный **API-ключ** для этого устройства. Веб-интерфейс хранит его в браузере и подставляет автоматически — отдельно вводить ключ не нужно. Ключ потребуется только если вы захотите обращаться к API напрямую (см. [Swagger](#справочник-по-api-swagger)). Ключ истекает, если им не пользоваться дольше срока неактивности (по умолчанию 30 дней); активные ключи продлеваются автоматически.
-
-В разделе настроек учётной записи можно:
-
-- **сменить пароль**;
-- **управлять активными ключами** — посмотреть список устройств, удалить отдельный ключ, завершить текущий сеанс или выйти на всех остальных устройствах;
-- **удалить учётную запись** вместе со всеми данными.
+1. **Register** and log in.
+2. **Add knowledge** — create a text note, save a web page by URL, or upload a PDF file.
+3. kvault **automatically indexes** the content and **assigns tags**.
+4. **Find what you need** via search, filter by tags.
+5. When needed, **manage tags and stopwords** to make auto-tagging more precise.
 
 ---
 
-## Заметки
+## Registration and login
 
-Заметки бывают двух типов: **текстовые** и **по ссылке (URL)**. Создаются они через одну кнопку создания — в открывшемся окне выберите нужную вкладку.
+1. On the login page, click the registration link.
+2. Enter a **username** (at least 3 characters) and a **password**.
+3. After registration you are logged in automatically.
 
-### Текстовые заметки
+> **How authorization works.** Each login issues a separate **API key** for that device. The web UI stores it in the browser and attaches it automatically — you never enter the key yourself. You only need the key if you want to call the API directly (see [Swagger](#api-reference-swagger)). A key expires if unused for longer than the inactivity period (30 days by default); active keys are extended automatically.
 
-1. Нажмите кнопку создания заметки.
-2. На вкладке **«Текст»** введите **заголовок** и нажмите Enter (или кнопку создания).
-3. Откроется редактор — заметки пишутся в **Markdown** с предпросмотром.
+In the account settings you can:
 
-Сразу после сохранения заметка индексируется для поиска, и к ней автоматически подбираются теги по содержимому.
-
-### Заметки по ссылке (URL)
-
-1. В окне создания перейдите на вкладку **«Ссылка»**.
-2. Введите **заголовок** и **адрес страницы**.
-3. kvault сам загрузит страницу и извлечёт из неё:
-   - **заголовок, описание и название сайта** (из метаданных страницы);
-   - **изображение предпросмотра** — превью с сайта показывается прямо в заметке;
-   - **основной текст страницы** — он становится доступным для поиска.
-
-Извлечённый текст индексируется и участвует в поиске и автотегировании наравне с обычными заметками. Таким образом сохранённая статья находится по словам из её содержимого, а не только по заголовку.
+- **change your password**;
+- **manage active keys** — view the device list, delete a specific key, end the current session, or log out on all other devices;
+- **delete your account** along with all its data.
 
 ---
 
-## Файлы
+## Notes
 
-Раздел **«Файлы»** предназначен для документов. Поддерживаются **PDF-файлы**.
+Notes come in two types: **text** and **URL**. Both are created via the same create button — pick the tab you need in the dialog that opens.
 
-**Как загрузить:**
+### Text notes
 
-- нажмите кнопку загрузки и выберите файл, **или**
-- перетащите PDF мышью прямо в область списка файлов.
+1. Click the note creation button.
+2. On the **"Text"** tab, enter a **title** and press Enter (or the create button).
+3. An editor opens — notes are written in **Markdown** with a preview.
 
-После загрузки файл проходит обработку в фоне: из PDF **извлекается текст**, который становится доступным для поиска. Пока идёт обработка, карточка файла показывает соответствующий статус.
+Right after saving, the note is indexed for search and tags are automatically derived from its content.
 
-**Метка на карточке файла** показывает, готов ли текст к поиску:
+### URL notes
 
-| Метка | Значение |
+1. In the creation dialog, switch to the **"Link"** tab.
+2. Enter a **title** and the **page address**.
+3. kvault fetches the page itself and extracts:
+   - the **title, description, and site name** (from the page metadata);
+   - a **preview image** — the site's preview is shown right in the note;
+   - the **main page text** — it becomes searchable.
+
+The extracted text is indexed and participates in search and auto-tagging just like regular notes. A saved article is therefore findable by words from its content, not just its title.
+
+---
+
+## Files
+
+The **"Files"** section is for documents. **PDF files** are supported.
+
+**How to upload:**
+
+- click the upload button and pick a file, **or**
+- drag a PDF straight into the file list area.
+
+After upload the file is processed in the background: text is **extracted** from the PDF and becomes searchable. While processing is in progress, the file card shows the corresponding status.
+
+**The label on the file card** shows whether the text is ready for search:
+
+| Label | Meaning |
 | --- | --- |
-| **Доступен для поиска** | Текст из файла извлечён и проиндексирован — файл находится по содержимому. |
-| **Недоступен для поиска** | Текст извлечь не удалось (например, PDF состоит из сканов-картинок без текстового слоя). Файл хранится и скачивается, но по содержимому не ищется. |
+| **Searchable** | Text was extracted from the file and indexed — the file is findable by its content. |
+| **Not searchable** | Text could not be extracted (e.g. the PDF consists of scanned images with no text layer). The file is stored and downloadable, but not findable by content. |
 
-Файл можно **открыть для просмотра**, **скачать** или **удалить** (в корзину).
+A file can be **opened for viewing**, **downloaded**, or **deleted** (to the trash bin).
 
 ---
 
-## Полнотекстовый поиск (FTS)
+## Full-text search (FTS)
 
-Поле поиска есть в разделах «Заметки» и «Файлы». Поиск идёт по **всему содержимому**: заголовкам, тексту заметок, извлечённому тексту веб-страниц и тексту из PDF. Результаты обновляются по мере ввода.
+The search field is available in the "Notes" and "Files" sections. Search covers **all content**: titles, note text, extracted web page text, and text from PDFs. Results update as you type.
 
-Синтаксис запросов близок к привычному поиску вроде Google:
+The query syntax is close to a familiar Google-like search:
 
-### Несколько слов = сужение результата (логическое И)
+### Multiple words narrow the result (logical AND)
 
-Чем больше слов вы вводите, тем уже результат: находятся записи, содержащие **все** указанные слова (в любом порядке, не обязательно рядом).
-
-```
-проектная документация
-```
-→ найдёт записи, где встречаются **и** «проектная», **и** «документация».
-
-### Поиск по началу слова (префиксный поиск)
-
-Не обязательно дописывать слово до конца — kvault ищет по **началу** слова. Это удобно для разных словоформ и для поиска «на лету».
+The more words you type, the narrower the result: entries are found that contain **all** of the given words (in any order, not necessarily adjacent).
 
 ```
-докум
+project documentation
 ```
-→ найдёт «**докум**ент», «**докум**ентация», «**докум**ентальный» и т. п.
+→ finds entries containing **both** "project" **and** "documentation".
+
+### Prefix search
+
+You don't have to type a word out in full — kvault matches by the **beginning** of a word. Handy for different word forms and search-as-you-type.
 
 ```
-прог язык
+docum
 ```
-→ найдёт записи, содержащие слово на «прог…» (программа, программирование) **и** слово на «язык…».
+→ finds "**docum**ent", "**docum**entation", "**docum**entary", etc.
 
-### Знаки препинания игнорируются
+```
+prog lang
+```
+→ finds entries containing a word starting with "prog…" (program, programming) **and** a word starting with "lang…".
 
-Точки, запятые, скобки и прочие символы внутри запроса отбрасываются — слово очищается до букв, цифр и дефиса. Запросы `e-mail`, `e-mail,` и `e mail` дадут практически одинаковый результат.
+### Punctuation is ignored
 
-### Регистр не важен
+Periods, commas, brackets, and other symbols inside a query are discarded — a word is reduced to letters, digits, and hyphens. The queries `e-mail`, `e-mail,` and `e mail` give practically the same result.
 
-`Postgres`, `postgres` и `POSTGRES` — одно и то же.
+### Case doesn't matter
 
-> **Чего поиск не делает.** Это не Google в полном смысле: специальные операторы (кавычки для точной фразы, `OR`, минус для исключения слов) **не поддерживаются**. Несколько слов всегда объединяются по правилу «И». Если ничего не находится — уберите лишние слова или сократите их до начала (префикса).
+`Postgres`, `postgres`, and `POSTGRES` are the same thing.
 
-**Примеры использования:**
+> **What search does not do.** It's not Google in the full sense: special operators (quotes for exact phrases, `OR`, minus to exclude words) are **not supported**. Multiple words are always combined with AND. If nothing is found — drop extra words or shorten them to a prefix.
 
-| Что нужно найти | Запрос |
+**Usage examples:**
+
+| What you're looking for | Query |
 | --- | --- |
-| Заметки про настройку nginx | `nginx настр` |
-| Статья, где упоминался Kubernetes | `kuber` |
-| Документ про налоговый отчёт за год | `налог отчёт` |
+| Notes about configuring nginx | `nginx config` |
+| The article that mentioned Kubernetes | `kuber` |
+| The document about the annual tax report | `tax report` |
 
-Поиск можно комбинировать с [фильтрами по тегам](#фильтры-и-сортировка) — например, найти все записи с тегом «работа», где встречается слово «дедлайн».
-
----
-
-## Фильтры и сортировка
-
-Под строкой поиска находятся элементы управления выдачей.
-
-### Фильтр по тегам
-
-Кнопка **«Теги»** открывает список ваших тегов с собственным поиском. Отметьте один или несколько тегов:
-
-- при выборе **нескольких** тегов показываются записи, у которых есть **хотя бы один** из выбранных тегов;
-- счётчик на кнопке показывает, сколько тегов сейчас выбрано;
-- кнопка **«Очистить»** сбрасывает выбор.
-
-### Сортировка
-
-Выпадающий список задаёт поле сортировки, а кнопка-стрелка переключает направление (по возрастанию ↑ / по убыванию ↓).
-
-**Заметки** можно сортировать по:
-- дате изменения,
-- дате создания,
-- заголовку.
-
-**Файлы** можно сортировать по:
-- дате создания,
-- имени файла,
-- размеру.
-
-> При активном поиске результаты дополнительно ранжируются по релевантности — наиболее подходящие записи оказываются выше.
-
-Все условия работают вместе: поиск + фильтр по тегам + сортировка применяются одновременно.
+Search can be combined with [tag filters](#filters-and-sorting) — e.g. find all entries tagged "work" that mention the word "deadline".
 
 ---
 
-## Теги
+## Filters and sorting
 
-Теги — это метки, по которым удобно группировать и фильтровать записи. Они бывают **автоматические** (расставляет kvault, см. [автотегирование](#стоп-слова-и-автотегирование)) и **ручные**.
+Below the search bar are the result controls.
 
-### Теги на странице заметки
+### Tag filter
 
-На странице открытой заметки можно:
+The **"Tags"** button opens your tag list with its own search. Check one or more tags:
 
-- **добавить тег** — кнопка с плюсом открывает список; выберите существующий тег или **создайте новый**, введя его название;
-- **снять тег** — клик по уже привязанному тегу убирает его с заметки;
-- **подобрать теги автоматически** — см. ниже.
+- with **multiple** tags selected, entries are shown that have **at least one** of the selected tags;
+- the counter on the button shows how many tags are currently selected;
+- the **"Clear"** button resets the selection.
 
-### Управление всеми тегами (Настройки → Теги)
+### Sorting
 
-В настройках на вкладке **«Теги»** доступен полный список ваших тегов:
+The dropdown sets the sort field, and the arrow button toggles the direction (ascending ↑ / descending ↓).
 
-- **поиск** и **сортировка** (по имени, дате создания, дате изменения);
-- рядом с каждым тегом показано, **в скольких записях** он используется;
-- **переименование** — клик по названию тега;
-- **удаление** — удаляет тег и снимает его со всех записей;
-- **создание** нового тега вручную.
+**Notes** can be sorted by:
+- modification date,
+- creation date,
+- title.
+
+**Files** can be sorted by:
+- creation date,
+- file name,
+- size.
+
+> With an active search, results are additionally ranked by relevance — the best matches come first.
+
+All conditions work together: search + tag filter + sorting apply simultaneously.
 
 ---
 
-## Стоп-слова и автотегирование
+## Tags
 
-Это две связанные функции: автотегирование подбирает теги по тексту, а стоп-слова управляют тем, какие слова в теги попадать **не должны**.
+Tags are labels for grouping and filtering entries. They are either **automatic** (assigned by kvault, see [auto-tagging](#stopwords-and-auto-tagging)) or **manual**.
 
-### Как работает автотегирование
+### Tags on the note page
 
-Когда вы создаёте заметку (или запрашиваете подбор тегов вручную), kvault анализирует её текст и выбирает несколько самых характерных слов в качестве тегов. Алгоритм:
+On an open note's page you can:
 
-1. Берётся весь проиндексированный текст записи (заголовок + содержимое + извлечённый текст ссылки).
-2. Подсчитывается, **как часто** встречается каждое слово.
-3. Из кандидатов **отсеиваются**:
-   - слишком короткие слова (3 буквы и короче);
-   - слова, содержащие не только буквы (числа, коды, артикулы);
-   - **стоп-слова** (см. ниже).
-4. Оставшиеся слова сортируются по частоте, и **самые частые** становятся тегами.
+- **add a tag** — the plus button opens the list; pick an existing tag or **create a new one** by typing its name;
+- **remove a tag** — clicking an attached tag removes it from the note;
+- **assign tags automatically** — see below.
 
-> **Достаточно текста.** Очень короткие записи не тегируются автоматически — по паре слов невозможно определить тему. Это относится и к заметкам по ссылке: если со страницы удалось извлечь слишком мало осмысленного текста, автотеги не создаются.
+### Managing all tags (Settings → Tags)
 
-### Ручной подбор тегов
+The **"Tags"** tab in settings shows the full list of your tags:
 
-На странице заметки есть функция **автотегирования** с настройкой **количества тегов** (по умолчанию 5). Укажите желаемое число и запустите — kvault добавит к заметке подходящие теги. Это удобно, если вы дописали заметку и хотите обновить набор тегов. Новые теги сразу появляются в общем списке тегов.
+- **search** and **sorting** (by name, creation date, modification date);
+- next to each tag, the number of **entries using it** is shown;
+- **renaming** — click the tag's name;
+- **deletion** — removes the tag and detaches it from all entries;
+- **manual creation** of a new tag.
 
-### Стоп-слова (Настройки → Стоп-слова)
+---
 
-Стоп-слова — это слова, которые **исключаются из автотегирования**. Без них тегами становились бы служебные слова вроде «это», «который», «the», «and».
+## Stopwords and auto-tagging
 
-kvault поставляется с готовым списком распространённых стоп-слов для **русского и английского** языков. Вы можете настроить список под себя:
+These are two related features: auto-tagging picks tags from text, and stopwords control which words must **not** become tags.
 
-- **Включить / выключить** слово переключателем. Выключенное стоп-слово снова сможет становиться тегом. Это работает и для слов из стандартного списка — если, например, вам нужен тег «work», отключите соответствующее стоп-слово.
-- **Добавить своё** стоп-слово — введите его и нажмите добавление. Полезно для часто встречающихся, но бесполезных в роли тега слов из вашей предметной области.
-- **Удалить** — удалять можно только **свои** слова; стандартные нельзя удалить, но можно отключить.
-- **Метка источника** показывает происхождение слова:
+### How auto-tagging works
 
-| Источник | Значение |
+When you create a note (or request tag suggestions manually), kvault analyzes its text and picks several of the most characteristic words as tags. The algorithm:
+
+1. Takes all of the entry's indexed text (title + content + extracted link text).
+2. Counts **how often** each word occurs.
+3. **Filters out** of the candidates:
+   - words that are too short (3 letters or fewer);
+   - words containing more than just letters (numbers, codes, part numbers);
+   - **stopwords** (see below).
+4. The remaining words are sorted by frequency, and the **most frequent** become tags.
+
+> **Enough text required.** Very short entries are not tagged automatically — a couple of words is not enough to determine the topic. This also applies to URL notes: if too little meaningful text could be extracted from the page, no auto-tags are created.
+
+### Manual tag suggestions
+
+The note page has an **auto-tagging** action with a configurable **number of tags** (5 by default). Set the desired count and run it — kvault adds suitable tags to the note. Handy when you've extended a note and want to refresh its tag set. New tags immediately appear in the global tag list.
+
+### Stopwords (Settings → Stopwords)
+
+Stopwords are words **excluded from auto-tagging**. Without them, function words like "this", "which", "the", "and" would become tags.
+
+kvault ships with a ready-made list of common stopwords for **Russian and English**. You can adjust the list to your needs:
+
+- **Enable / disable** a word with the toggle. A disabled stopword can become a tag again. This also works for the built-in list — if you want a "work" tag, for example, disable the corresponding stopword.
+- **Add your own** stopword — type it and confirm. Useful for words that are frequent in your domain but useless as tags.
+- **Delete** — only **your own** words can be deleted; built-in ones can't be deleted, but can be disabled.
+- The **source label** shows where a word came from:
+
+| Source | Meaning |
 | --- | --- |
-| **Стандартное** | Из встроенного списка kvault. Можно отключить, нельзя удалить. |
-| **Пользовательское** | Добавлено вами. Можно отключать и удалять. |
+| **Built-in** | From kvault's bundled list. Can be disabled, can't be deleted. |
+| **Custom** | Added by you. Can be disabled and deleted. |
 
-Список поддерживает поиск, сортировку (по слову, источнику, дате изменения) и фильтр по источнику.
+The list supports search, sorting (by word, source, modification date), and filtering by source.
 
-> **Когда применяются изменения.** Стоп-слова учитываются в момент подбора тегов. Уже расставленные теги при изменении списка стоп-слов автоматически не пересчитываются — чтобы обновить теги конкретной заметки, запустите для неё ручной подбор тегов.
-
----
-
-## Корзина
-
-Удалённые заметки и файлы попадают в **корзину**, а не стираются сразу. В корзине запись можно:
-
-- **восстановить** на прежнее место;
-- **удалить безвозвратно** (по одной записи или очистить корзину целиком).
-
-Так удаление защищено от случайностей.
+> **When changes take effect.** Stopwords are applied at tag-selection time. Already assigned tags are not recalculated automatically when the stopword list changes — to refresh a specific note's tags, run manual tag suggestions for it.
 
 ---
 
-## Язык и тема оформления
+## Trash bin
 
-В верхней части интерфейса находятся переключатели языка и темы.
+Deleted notes and files go to the **trash bin** instead of being erased immediately. From the bin an entry can be:
 
-**Язык интерфейса.** Кнопка с кодом языка (`EN` / `RU` / `JA`) открывает выбор:
+- **restored** to its previous place;
+- **deleted permanently** (one entry at a time, or by emptying the whole bin).
+
+This protects deletion from accidents.
+
+---
+
+## Language and theme
+
+The language and theme switches are at the top of the UI.
+
+**UI language.** The button with the language code (`EN` / `RU` / `JA`) opens the selection:
 
 - 🇬🇧 English
 - 🇷🇺 Русский
 - 🇯🇵 日本語
 
-**Тема оформления.** Кнопка с иконкой солнца/луны переключает **светлую** и **тёмную** темы.
+**Theme.** The sun/moon icon button toggles the **light** and **dark** themes.
 
-Оба выбора сохраняются в браузере и применяются автоматически при следующем визите.
+Both choices are saved in the browser and applied automatically on your next visit.
 
 ---
 
-## Справочник по API (Swagger)
+## API reference (Swagger)
 
-Помимо веб-интерфейса, kvault предоставляет **REST API**. Если вы хотите интегрировать kvault со своими скриптами или приложениями, полная интерактивная документация доступна по адресу:
+Besides the web UI, kvault provides a **REST API**. If you want to integrate kvault with your scripts or applications, the full interactive documentation is available at:
 
 ```
-http://<адрес-вашего-сервера>/swagger
+http://<your-server-address>/swagger
 ```
 
-Там перечислены все доступные операции (заметки, файлы, теги, стоп-слова, авторизация) с описанием параметров и возможностью отправить пробный запрос. Для обращений к API используется ваш персональный **API-ключ** в заголовке `Authorization`.
+It lists all available operations (notes, files, tags, stopwords, authorization) with parameter descriptions and the ability to send a test request. API calls use your personal **API key** in the `Authorization` header.

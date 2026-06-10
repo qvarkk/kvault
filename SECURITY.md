@@ -1,68 +1,68 @@
-# Политика безопасности
+# Security Policy
 
-kvault — это система для **личного самостоятельного хостинга**. Модель безопасности у бэкенда и фронтенда общая, поэтому этот документ относится ко всему проекту.
+kvault is a system for **personal self-hosting**. The backend and the frontend share one security model, so this document applies to the whole project.
 
 > [!IMPORTANT]
-> kvault разрабатывался как личное приложение, разворачиваемое в доверенном окружении. В нём **нет защиты, рассчитанной на публичный доступ из интернета**. Прочитайте этот документ перед развёртыванием.
+> kvault was designed as a personal application deployed in a trusted environment. It has **no protection intended for public internet exposure**. Read this document before deploying.
 
 ---
 
-## Модель угроз и допущения
+## Threat model and assumptions
 
-kvault исходит из того, что:
+kvault assumes that:
 
-- сервером управляет сам пользователь либо полностью доверенное лицо;
-- сервис **не выставлен** напрямую в открытый интернет;
-- доступ к серверу ограничен на сетевом уровне (VPN, файрвол, закрытый контур).
+- the server is operated by the user themselves or by a fully trusted person;
+- the service is **not exposed** directly to the open internet;
+- access to the server is restricted at the network level (VPN, firewall, private network).
 
-Если эти допущения не выполняются, безопасность данных не гарантируется.
-
----
-
-## Что нужно знать о безопасности данных
-
-### Администратор сервера видит всё
-
-Владелец сервера имеет полный доступ к данным **всех** пользователей:
-
-- содержимому заметок и извлечённому тексту веб-страниц;
-- загруженным файлам;
-- тегам и стоп-словам;
-- **API-ключам** пользователей.
-
-Данные хранятся в базе и в хранилище файлов **без шифрования**. Доверяйте данные только серверу, которым управляете вы или кому полностью доверяете.
-
-### Срок жизни и отзыв API-ключей
-
-Каждый вход выдаёт **отдельный ключ на устройство** — другие сеансы при этом не сбрасываются. Ключ действует по **скользящему сроку**: истекает, если им не пользовались дольше `AUTH_API_KEY_TTL` (по умолчанию 30 дней). Каждое использование продлевает срок.
-
-При утечке ключа (что маловероятно для личного, не выставленного наружу сервера, но всё же возможно) отозвать доступ можно в настройках учётной записи:
-
-- **удалить конкретный ключ** — отключает соответствующее устройство;
-- **выйти** — отзывает ключ текущего сеанса;
-- **выйти на остальных устройствах** — отзывает все ключи, кроме текущего.
-
-Просроченные ключи отбрасываются при попытке аутентификации.
-
-### Шифрования нет
-
-В kvault не реализовано шифрование данных «на диске» (at rest) и нет защиты от злоумышленника, получившего доступ к серверу или к Docker-томам. Защита данных целиком ложится на **окружение**, в котором запущен сервис.
+If these assumptions do not hold, data security is not guaranteed.
 
 ---
 
-## Рекомендации по развёртыванию
+## What you should know about data security
 
-- **Не публикуйте сервис в открытый интернет.** Используйте VPN, пускающий только доверенные устройства, либо ограничьте доступ файрволом по IP. Простой готовый вариант — открыть kvault только внутри tailnet через Tailscale: см. [Доступ через Tailscale](./HOSTING.md#доступ-через-tailscale-vpn).
-- **Используйте HTTPS** при доступе через домен — терминируйте TLS на реверс-прокси (см. [HOSTING.md](./HOSTING.md)).
-- **Смените стандартные пароли.** Перед запуском обязательно задайте надёжные `DB_PASSWORD` и `REDIS_PASSWORD` в `.env`. Сгенерировать значение можно через `openssl rand -hex 24`.
-- **Берегите `.env`.** Файл содержит пароли БД и ключи доступа к хранилищу. Не коммитьте его в систему контроля версий, ограничьте права доступа к нему на сервере.
-- **Делайте резервные копии** базы PostgreSQL и хранилища Garage (`garage_meta`/`garage_data` или каталог `./data/garage` при bind-mount) — пошагово в [HOSTING.md](./HOSTING.md#обновление-и-обслуживание). Храните копии в безопасном месте.
-- **Обновляйтесь.** Образы собираются из исходников: задайте свежую версию в `KVAULT_VERSION` и пересоберите (`docker compose up -d --build`) — см. [HOSTING.md](./HOSTING.md#обновление-и-обслуживание).
+### The server administrator sees everything
+
+The server owner has full access to **all** users' data:
+
+- note content and text extracted from web pages;
+- uploaded files;
+- tags and stopwords;
+- users' **API keys**.
+
+Data is stored in the database and the file storage **without encryption**. Only entrust your data to a server operated by you or by someone you fully trust.
+
+### API key lifetime and revocation
+
+Each login issues a **separate per-device key** — other sessions are not invalidated. A key works on a **sliding expiration**: it expires if unused for longer than `AUTH_API_KEY_TTL` (30 days by default). Every use extends the lifetime.
+
+If a key leaks (unlikely for a personal, non-exposed server, but still possible), access can be revoked in the account settings:
+
+- **delete a specific key** — disconnects the corresponding device;
+- **log out** — revokes the current session's key;
+- **log out on other devices** — revokes all keys except the current one.
+
+Expired keys are rejected at authentication.
+
+### There is no encryption
+
+kvault does not implement at-rest data encryption and has no protection against an attacker who gains access to the server or the Docker volumes. Data protection rests entirely on the **environment** the service runs in.
 
 ---
 
-## Сообщить об уязвимости
+## Deployment recommendations
 
-Если вы нашли уязвимость, **не создавайте публичную issue**. Напишите на почту: **kvault@gmail.com**.
+- **Do not publish the service to the open internet.** Use a VPN that admits only trusted devices, or restrict access with an IP firewall. A simple ready-made option is to expose kvault only inside a tailnet via Tailscale: see [Access via Tailscale](./HOSTING.md#access-via-tailscale-vpn).
+- **Use HTTPS** when accessing via a domain — terminate TLS at the reverse proxy (see [HOSTING.md](./HOSTING.md)).
+- **Use generated secrets.** `setup.sh` creates `.env` with random passwords and keys — there are no defaults. If you fill `.env` manually, generate secrets with `openssl rand -hex 24` and avoid dictionary passwords.
+- **Protect `.env`.** The file contains database passwords and storage access keys. Do not commit it to version control; restrict its permissions on the server.
+- **Make backups** of the PostgreSQL database and the Garage storage (`garage_meta`/`garage_data`, or the `./data/garage` directory with bind mounts) — step by step in [HOSTING.md](./HOSTING.md#updates-and-maintenance). Keep the copies somewhere safe.
+- **Keep up to date.** Periodically pull fresh images: `docker compose pull && docker compose up -d` — see [HOSTING.md](./HOSTING.md#updates-and-maintenance).
 
-Опишите проблему, шаги воспроизведения и потенциальное влияние. Постараемся ответить в разумные сроки.
+---
+
+## Reporting a vulnerability
+
+If you find a vulnerability, **do not open a public issue**. Email **kvault@gmail.com**.
+
+Describe the problem, reproduction steps, and potential impact. We will try to respond within a reasonable time.

@@ -1,68 +1,69 @@
-# Участие в разработке kvault
+# Contributing to kvault
 
-Спасибо за интерес к kvault. Монорепозиторий: бэкенд (REST API на Go) — в [`backend/`](./backend), фронтенд (Vue 3) — в [`frontend/`](./frontend).
+Thanks for your interest in kvault. Monorepo: the backend (REST API in Go) lives in [`backend/`](./backend), the frontend (Vue 3) in [`frontend/`](./frontend).
 
-## Стек
+## Stack
 
-**Бэкенд:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq
-**Фронтенд:** Vue 3 · TypeScript · Vite · Tailwind CSS
+**Backend:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq
+**Frontend:** Vue 3 · TypeScript · Vite · Tailwind CSS
 
-## Локальное окружение
+## Local environment
 
 ```bash
-# Скопировать и заполнить конфиг (в корне репозитория)
-cp .env.example .env
+# Create .env with generated secrets (at the repo root)
+sh setup.sh
 
-# Команды make выполняются из backend/
+# make commands run from backend/
 cd backend
 
-# Поднять инфраструктуру (PostgreSQL, Redis, Garage)
+# Start the infrastructure (PostgreSQL, Redis, Garage)
 make docker-up-infra
 
-# Применить миграции
+# Apply migrations
 make migrate-up
 
-# Запустить API и фоновый воркер (в отдельных терминалах)
+# Run the API and the background worker (in separate terminals)
 make run-api
 make run-worker
 ```
 
-Фронтенд (в отдельном терминале):
+Frontend (in a separate terminal):
 
 ```bash
 cd frontend
+cp .env.example .env   # local API address for the dev server
 npm install
-npm run dev    # dev-сервер Vite
+npm run dev            # Vite dev server
 ```
 
-## Полезные команды
+## Useful commands
 
 ```bash
-make build-api        # собрать API в bin/kvault_api
-make build-worker     # собрать воркер в bin/kvault_worker
-make migrate-up       # применить миграции
-make migrate-down     # откатить одну миграцию
-make swagger          # перегенерировать Swagger-документацию
+make build-api        # build the API into bin/kvault_api
+make build-worker     # build the worker into bin/kvault_worker
+make migrate-up       # apply migrations
+make migrate-down     # roll back one migration
+make swagger          # regenerate Swagger documentation
 make tidy             # go mod tidy
 ```
 
-## Как внести вклад
+## How to contribute
 
-1. Создайте ветку от `main`.
-2. Внесите изменения; держите коммиты сфокусированными, пишите осмысленные сообщения.
-3. Убедитесь, что проект собирается (`make build-api`, `make build-worker`).
-4. При изменении аннотаций обработчиков обновите Swagger: `make swagger`.
-5. Откройте pull request с описанием сути и причины изменений.
+1. Create a branch off `main`.
+2. Make your changes; keep commits focused and write meaningful messages.
+3. Make sure the project builds (`make build-api`, `make build-worker`).
+4. If you change handler annotations, update Swagger: `make swagger`.
+5. Open a pull request describing what changed and why.
 
-## Правила по коду
+## Code guidelines
 
-- **Запросы к БД** стройте через `squirrel` — не через форматирование строк (риск SQL-инъекций).
-- Соблюдайте слоистую архитектуру: `domain → repositories → services → handlers → routes`.
-- Ошибки прокидывайте через типизированные ошибки слоёв (`repositories/errors.go`, `services/errors.go`); HTTP-ответы об ошибках формирует middleware.
-- Изменения схемы БД оформляйте новой миграцией в `migrations/` (формат golang-migrate), не правьте существующие миграции.
+- **Build DB queries** with `squirrel` — not with string formatting (SQL injection risk).
+- Follow the layered architecture: `domain → repositories → services → handlers → routes`.
+- Propagate errors through the typed layer errors (`repositories/errors.go`, `services/errors.go`); HTTP error responses are produced by middleware.
+- Ship DB schema changes as a new migration in `migrations/` (golang-migrate format); never edit existing migrations.
 
-## Сообщения об ошибках
+## Reporting issues
 
-Для багов и предложений создавайте issue с описанием, шагами воспроизведения и ожидаемым поведением. Уязвимости — не в публичные issue, см. [SECURITY.md](./SECURITY.md).
+For bugs and feature requests, open an issue with a description, reproduction steps, and expected behavior. Vulnerabilities — not in public issues, see [SECURITY.md](./SECURITY.md).
 
-Участвуя в проекте, вы соглашаетесь соблюдать [Кодекс поведения](./CODE_OF_CONDUCT.md).
+By participating in this project you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.md).

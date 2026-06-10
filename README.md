@@ -1,122 +1,94 @@
 # kvault
 
-**Самостоятельно хостируемая система управления знаниями.** Храните заметки, веб-страницы и PDF-документы в одном месте — с автоматической тегизацией и полнотекстовым поиском по всему содержимому.
+**Self-hosted knowledge management system.** Keep notes, web pages, and PDF documents in one place — with automatic tagging and full-text search across all content.
 
-Монорепозиторий: [`backend/`](./backend) — REST API (Go), [`frontend/`](./frontend) — веб-интерфейс (Vue 3). Оркестрация всего стека — `docker-compose.yml` в корне.
-
----
-
-## Возможности
-
-- **Разнородные источники.** Текстовые заметки в Markdown, веб-страницы по ссылке (с извлечением текста, метаданных и превью), PDF-документы.
-- **Полнотекстовый поиск.** Поиск по заголовкам, тексту заметок, содержимому веб-страниц и тексту из PDF. Поддержка префиксного поиска и ранжирования по релевантности.
-- **Автоматическая тегизация.** Теги подбираются по содержимому записи; список стоп-слов (RU/EN) настраивается.
-- **Управление тегами и стоп-словами.** Ручная привязка, переименование, фильтрация по тегам.
-- **Корзина.** Удаление с возможностью восстановления и безвозвратной очистки.
-- **Хранение файлов.** S3-совместимое хранилище (Garage) с доступом по временным presigned-ссылкам.
-- **Асинхронная обработка.** Извлечение текста из PDF и веб-страниц выполняется фоновым воркером.
+Monorepo: [`backend/`](./backend) — REST API (Go), [`frontend/`](./frontend) — web UI (Vue 3). The whole stack is orchestrated by `docker-compose.yml` at the root.
 
 ---
 
-## Документация
+## Features
 
-| Документ                                   | Назначение                                                                    |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| [DOCUMENTATION.md](./DOCUMENTATION.md)     | Руководство пользователя: поиск, фильтры, теги, стоп-слова, рабочие сценарии. |
-| [HOSTING.md](./HOSTING.md)                 | Полное руководство по развёртыванию: `.env`, домен, реверс-прокси, HTTPS.     |
-| [SECURITY.md](./SECURITY.md)               | Модель безопасности и рекомендации по защите данных.                          |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)       | Как участвовать в разработке.                                                 |
-| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | Кодекс поведения участников.                                                  |
+- **Heterogeneous sources.** Markdown text notes, web pages by URL (with text, metadata, and preview extraction), PDF documents.
+- **Full-text search.** Searches titles, note text, web page content, and text extracted from PDFs. Supports prefix search and relevance ranking.
+- **Automatic tagging.** Tags are derived from the entry's content; the stopword list (RU/EN) is configurable.
+- **Tag and stopword management.** Manual assignment, renaming, filtering by tags.
+- **Trash bin.** Deletion with restore support and permanent purge.
+- **File storage.** S3-compatible storage (Garage) with access via temporary presigned URLs.
+- **Asynchronous processing.** Text extraction from PDFs and web pages runs in a background worker.
 
 ---
 
-## Быстрый старт
+## Documentation
 
-Требуется **Docker** и **Docker Compose**.
+| Document                                   | Purpose                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------ |
+| [DOCUMENTATION.md](./DOCUMENTATION.md)     | User guide: search, filters, tags, stopwords, common workflows.          |
+| [HOSTING.md](./HOSTING.md)                 | Complete deployment guide: `.env`, domain, reverse proxy, HTTPS.         |
+| [SECURITY.md](./SECURITY.md)               | Security model and data protection recommendations.                      |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)       | How to contribute.                                                       |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | Contributor code of conduct.                                             |
+
+---
+
+## Quick start
+
+Requires **Docker** and **Docker Compose**.
 
 ```bash
 mkdir kvault && cd kvault
 
-# Compose-файл и пример конфига
 curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example
-mv .env.example .env
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/setup.sh
+sh setup.sh        # creates .env and generates secrets
 
-# Конфиги Redis и Garage
-mkdir -p docker/redis docker/garage
-curl -o docker/redis/redis.conf    https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
-curl -o docker/redis/entrypoint.sh https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/entrypoint.sh
-curl -o docker/garage/garage.toml  https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
-
-# Перед запуском смените в .env как минимум DB_PASSWORD и REDIS_PASSWORD
-# (сгенерировать пароль: openssl rand -hex 24)
-
-docker compose up -d --build
-```
-
-Образы собираются из исходников — внешний реестр не нужен. Версию задаёт `KVAULT_VERSION` в `.env` (git-тег/ветка, по умолчанию `main`).
-
-**Инициализация хранилища Garage (обязательно — без неё не работает загрузка файлов):**
-
-```bash
-alias garage="docker exec kvault_garage /garage"
-
-# Создать layout (подставьте <node-id> из вывода garage status)
-garage status
-garage layout assign -z dc1 -c 1G <node-id>
-garage layout apply --version 1
-
-# Создать ключ (сохраните Secret Key — позже недоступен) и бакет
-garage key create kvault-key
-garage bucket create kvault-bucket
-garage bucket allow --read --write --owner kvault-bucket --key kvault-key
-
-# Впишите Access Key ID и Secret Key в .env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), затем:
 docker compose up -d
 ```
 
-Фронтенд откроется на `http://<адрес-сервера>` (порт `80` по умолчанию).
+Prebuilt images are pulled from GitHub Container Registry. The version is set by `KVAULT_VERSION` in `.env` (`latest` — latest release, `v1.0.0` — specific version). Garage storage is initialized automatically (the one-shot `garage-init` service creates the layout, access key, and bucket from the values in `.env`).
 
-> Настройка домена, реверс-прокси и HTTPS, а также подробное описание шага с Garage — в **[HOSTING.md](./HOSTING.md)**.
+The frontend opens at `http://<server-address>` (port `80` by default).
+
+> Domain setup, reverse proxy and HTTPS, plus a detailed description of the Garage step — in **[HOSTING.md](./HOSTING.md)**.
 
 ---
 
-## Безопасность
+## Security
 
 > [!WARNING]
-> kvault рассчитан на **личный самостоятельный хостинг в доверенном окружении**. Шифрования данных нет, администратор сервера видит содержимое всех пользователей. API-ключи выдаются на устройство и истекают по сроку неактивности (по умолчанию 30 дней). **Не выставляйте сервис в открытый интернет** — используйте VPN или файрвол. Подробнее: [SECURITY.md](./SECURITY.md).
+> kvault is designed for **personal self-hosting in a trusted environment**. There is no data encryption; the server administrator can see all users' content. API keys are issued per device and expire after inactivity (30 days by default). **Do not expose the service to the open internet** — use a VPN or firewall. Details: [SECURITY.md](./SECURITY.md).
 
 ---
 
-## Разработка
+## Development
 
 ```bash
-cp .env.example .env
+sh setup.sh            # creates .env and generates secrets
 
-# Бэкенд (команды выполняются из backend/)
+# Backend (commands run from backend/)
 cd backend
-make docker-up-infra   # поднять PostgreSQL, Redis, Garage
-make migrate-up        # применить миграции
-make run-api           # запустить API
-make run-worker        # запустить фоновый воркер
+make docker-up-infra   # start PostgreSQL, Redis, Garage
+make migrate-up        # apply migrations
+make run-api           # run the API
+make run-worker        # run the background worker
 
-# Фронтенд (в отдельном терминале)
+# Frontend (in a separate terminal)
 cd frontend
+cp .env.example .env   # local API address for the dev server
 npm install
-npm run dev            # dev-сервер Vite
+npm run dev            # Vite dev server
 ```
 
-Интерактивный справочник API (Swagger) доступен по адресу `/swagger`. Подробнее — в [CONTRIBUTING.md](./CONTRIBUTING.md).
+The interactive API reference (Swagger) is available at `/swagger`. More details in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ---
 
-## Стек
+## Stack
 
-**Бэкенд:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · sqlx + squirrel · Zap
-**Фронтенд:** Vue 3 · TypeScript · Vite · Tailwind CSS
+**Backend:** Go · Gin · PostgreSQL · Redis · Garage (S3) · Asynq · sqlx + squirrel · Zap
+**Frontend:** Vue 3 · TypeScript · Vite · Tailwind CSS
 
 ---
 
-## Лицензия
+## License
 
 [MIT](./LICENSE)

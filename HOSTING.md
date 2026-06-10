@@ -1,256 +1,221 @@
-# Самостоятельный хостинг kvault
+# Self-hosting kvault
 
-Это руководство описывает, как развернуть **kvault** на собственном сервере: от первого запуска до доступа по вашему домену через реверс-прокси с HTTPS.
+This guide describes how to deploy **kvault** on your own server: from the first run to access via your own domain through a reverse proxy with HTTPS.
 
-kvault распространяется как набор Docker-образов и запускается одной командой через Docker Compose. Весь стек (фронтенд, API, фоновый воркер, PostgreSQL, Redis и S3-хранилище Garage) поднимается вместе.
-
----
-
-## Содержание
-
-- [Что вам понадобится](#что-вам-понадобится)
-- [Шаг 1. Получение файлов](#шаг-1-получение-файлов)
-- [Шаг 2. Настройка .env](#шаг-2-настройка-env)
-- [Шаг 3. Первый запуск](#шаг-3-первый-запуск)
-- [Шаг 4. Настройка хранилища Garage (S3)](#шаг-4-настройка-хранилища-garage-s3)
-- [Доступ через Tailscale (VPN)](#доступ-через-tailscale-vpn)
-- [Доступ по своему домену](#доступ-по-своему-домену)
-- [Реверс-прокси на поддомен (с HTTPS)](#реверс-прокси-на-поддомен-с-https)
-- [Загрузка файлов и presigned-ссылки](#загрузка-файлов-и-presigned-ссылки)
-- [Справочник переменных .env](#справочник-переменных-env)
-- [Обновление и обслуживание](#обновление-и-обслуживание)
-- [Решение частых проблем](#решение-частых-проблем)
+kvault is distributed as a set of Docker images and starts with a single Docker Compose command. The whole stack (frontend, API, background worker, PostgreSQL, Redis, and the Garage S3 storage) comes up together.
 
 ---
 
-## Что вам понадобится
+## Contents
 
-- Сервер (VPS или физическая машина) с **Docker** и **Docker Compose**.
-- Открытые наружу порты (минимум — порт фронтенда, по умолчанию `80`).
-- _Опционально, но рекомендуется:_ доменное имя и реверс-прокси (nginx, Caddy, Traefik) для HTTPS.
+- [What you'll need](#what-youll-need)
+- [Step 1. Getting the files](#step-1-getting-the-files)
+- [Step 2. Configuring .env](#step-2-configuring-env)
+- [Step 3. First run](#step-3-first-run)
+- [Step 4. Garage storage (S3)](#step-4-garage-storage-s3)
+- [Access via Tailscale (VPN)](#access-via-tailscale-vpn)
+- [Access via your own domain](#access-via-your-own-domain)
+- [Reverse proxy on a subdomain (with HTTPS)](#reverse-proxy-on-a-subdomain-with-https)
+- [File uploads and presigned URLs](#file-uploads-and-presigned-urls)
+- [.env variable reference](#env-variable-reference)
+- [Updates and maintenance](#updates-and-maintenance)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## Шаг 1. Получение файлов
+## What you'll need
 
-Создайте отдельный каталог под развёртывание и скачайте в него compose-файл, пример конфигурации и вспомогательные конфиги Redis и Garage:
+- A server (VPS or physical machine) with **Docker** and **Docker Compose**.
+- Externally open ports (at minimum the frontend port, `80` by default).
+- _Optional but recommended:_ a domain name and a reverse proxy (nginx, Caddy, Traefik) for HTTPS.
+
+---
+
+## Step 1. Getting the files
+
+Create a dedicated directory for the deployment, download the compose file and the setup script. That's everything: the Redis and Garage configs are embedded in the compose file itself.
 
 ```bash
 mkdir kvault && cd kvault
 
-# Compose-файл и пример конфига
 curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example
-mv .env.example .env
-
-# Конфиги Redis и Garage
-mkdir -p docker/redis docker/garage
-curl -o docker/redis/redis.conf      https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/redis.conf
-curl -o docker/redis/entrypoint.sh   https://raw.githubusercontent.com/qvarkk/kvault/main/docker/redis/entrypoint.sh
-curl -o docker/garage/garage.toml    https://raw.githubusercontent.com/qvarkk/kvault/main/docker/garage/garage.toml
+curl -O https://raw.githubusercontent.com/qvarkk/kvault/main/setup.sh
+sh setup.sh
 ```
 
-> **Образы собираются из исходников.** kvault не зависит от внешнего реестра образов — при первом запуске Docker сам скачивает исходный код из репозитория и собирает образы локально. Какую версию собирать, задаёт переменная `KVAULT_VERSION` в `.env` (любой git-тег, ветка или коммит; по умолчанию `main` — последняя версия). Подробнее — в разделе [Версии и обновление](#обновление-и-обслуживание).
+`setup.sh` creates `.env` and generates all internal secrets (DB and Redis passwords, the Garage secret, the S3 key) — no need to invent and type them in yourself. The script never overwrites an existing `.env`.
+
+> **Prebuilt images.** kvault is distributed as Docker images from GitHub Container Registry (`ghcr.io/qvarkk/kvault`, `ghcr.io/qvarkk/kvault-frontend`) — nothing is built on the server. The version is set by `KVAULT_VERSION` in `.env` (`latest` by default — the latest release). More in [Updates and maintenance](#updates-and-maintenance). If you want to build from source — clone the repository: `docker compose up -d --build` builds the images from the working tree.
 
 ---
 
-## Шаг 2. Настройка .env
+## Step 2. Configuring .env
 
-Откройте `.env` и **обязательно** измените перед запуском в продакшене:
+Secrets are already generated by `setup.sh`. For localhost access `.env` is ready as is; if kvault will be reached at a different address (domain, tailnet, server IP) — adjust:
 
-| Переменная                | Зачем менять                                                                                    |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `DB_PASSWORD`             | Пароль базы данных — задайте надёжный.                                                          |
-| `REDIS_PASSWORD`          | Пароль Redis — задайте надёжный.                                                                |
-| `API_CORS_ORIGINS`        | Публичный адрес, по которому будет открываться kvault (см. ниже).                               |
-| `AWS_PUBLIC_ENDPOINT_URL` | Публичный адрес хранилища файлов (см. [presigned-ссылки](#загрузка-файлов-и-presigned-ссылки)). |
+| Variable                  | Why                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `API_CORS_ORIGINS`        | The public address kvault will be opened at (see below).                                  |
+| `AWS_PUBLIC_ENDPOINT_URL` | The public address of the file storage (see [presigned URLs](#file-uploads-and-presigned-urls)). |
 
-Надёжные пароли удобно генерировать через `openssl` — по 24 случайных байта (48 hex-символов):
+<details>
+<summary>Filling .env manually (without setup.sh)</summary>
+
+Download [.env.example](https://raw.githubusercontent.com/qvarkk/kvault/main/.env.example), rename it to `.env`, and generate the values:
 
 ```bash
-openssl rand -hex 24
+openssl rand -hex 24             # DB_PASSWORD, REDIS_PASSWORD — separately for each
+openssl rand -hex 32             # GARAGE_RPC_SECRET
+echo "GK$(openssl rand -hex 12)" # AWS_ACCESS_KEY_ID (Garage format: GK + 24 hex chars)
+openssl rand -hex 32             # AWS_SECRET_ACCESS_KEY
 ```
 
-Запустите команду отдельно для `DB_PASSWORD` и `REDIS_PASSWORD` и впишите полученные значения в `.env`.
+</details>
 
-Ключи доступа к хранилищу (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) вы заполните позже — на [шаге 4](#шаг-4-настройка-хранилища-garage-s3), после генерации их в Garage.
-
-Полное описание всех переменных — в [справочнике ниже](#справочник-переменных-env).
+A full description of all variables is in the [reference below](#env-variable-reference).
 
 ---
 
-## Шаг 3. Первый запуск
-
-```bash
-docker compose up -d --build
-```
-
-Флаг `--build` собирает образы из исходников (Docker скачает код из репозитория). Первая сборка занимает несколько минут — дальше образы кэшируются.
-
-> **Если вы клонировали репозиторий** (а не скачали отдельные файлы), `docker compose up -d --build` автоматически подхватит `docker-compose.override.yml` и соберёт образы из рабочей копии. Для сборки из git, как на сервере, укажите файл явно: `docker compose -f docker-compose.yml up -d --build`.
-
-Поднимутся все сервисы. Контейнер `migrate` один раз применит миграции базы данных и завершится — это нормально.
-
-Проверить состояние:
-
-```bash
-docker compose ps
-docker compose logs -f        # логи всех сервисов
-```
-
-После запуска фронтенд доступен по адресу `http://<адрес-сервера>` (порт `80` по умолчанию).
-
-> На этом этапе вход в систему уже работает, но **загрузка файлов ещё не будет работать**, пока вы не настроите хранилище Garage на следующем шаге.
-
----
-
-## Шаг 4. Настройка хранилища Garage (S3)
-
-Garage — это S3-совместимое хранилище для загружаемых файлов. При первом запуске нужно один раз инициализировать кластер и сгенерировать ключи доступа.
-
-```bash
-# Удобный алиас
-alias garage="docker exec kvault_garage /garage"
-
-# 1. Узнать ID узла
-garage status
-
-# 2. Создать layout кластера (подставьте <node-id> из вывода выше).
-#    Флаг -c задаёт ёмкость узла.
-garage layout assign -z dc1 -c 1G <node-id>
-garage layout apply --version 1
-
-# 3. Создать ключ доступа.
-#    ВАЖНО: сохраните Secret Key сразу — позже его посмотреть нельзя.
-garage key create kvault-key
-
-# 4. Создать бакет и выдать ключу права на него
-garage bucket create kvault-bucket
-garage bucket allow --read --write --owner kvault-bucket --key kvault-key
-```
-
-Подробнее о layout: <https://garagehq.deuxfleurs.fr/documentation/quick-start/#creating-a-cluster-layout>
-
-Перенесите выданные **Access Key ID** и **Secret Key** в `.env`:
-
-```bash
-AWS_ACCESS_KEY_ID="<сгенерированный Access Key ID>"
-AWS_SECRET_ACCESS_KEY="<сгенерированный Secret Key>"
-AWS_S3_BUCKET="kvault-bucket"
-```
-
-Перезапустите, чтобы применить новые значения:
+## Step 3. First run
 
 ```bash
 docker compose up -d
 ```
 
-Теперь загрузка и просмотр файлов работают.
+Docker pulls the prebuilt images from GHCR and brings up the stack — no build required.
+
+> **If you cloned the repository** (instead of downloading individual files), `docker compose up -d --build` automatically picks up `docker-compose.override.yml` and builds the images from the working tree instead of pulling. For server-like behavior, specify the file explicitly: `docker compose -f docker-compose.yml up -d`.
+
+All services come up. Two one-shot containers exit on their own — that's normal: `migrate` applies the database migrations, `garage-init` initializes the Garage storage (layout, access key from `.env`, bucket).
+
+Check the state:
+
+```bash
+docker compose ps
+docker compose logs -f        # logs of all services
+```
+
+After startup, the frontend is available at `http://<server-address>` (port `80` by default).
 
 ---
 
-## Доступ через Tailscale (VPN)
+## Step 4. Garage storage (S3)
 
-Если kvault крутится на домашней машине или ноутбуке без публичного IP и домена, самый простой и безопасный вариант — открыть его **только внутри tailnet** через [Tailscale](https://tailscale.com). Tailscale поднимает приватную WireGuard-сеть: сервис видят лишь ваши доверенные устройства, наружу ничего не торчит. Это рекомендуемый способ для личного хостинга и конкретная реализация требования из [SECURITY.md](./SECURITY.md) «не выставлять сервис в открытый интернет».
+Garage is the S3-compatible storage for uploaded files. No manual setup is needed: on first run the one-shot `garage-init` service creates the cluster layout, imports the access key (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` from `.env`), and creates the bucket. The service is idempotent — re-runs don't break anything.
 
-Установите Tailscale на сервер **и** на устройства, с которых будете заходить, и авторизуйтесь:
+Verify that initialization succeeded:
 
 ```bash
-# на сервере
+docker compose logs garage-init     # should end with: garage-init: done
+docker exec kvault_garage /garage status   # node with a role and capacity
+```
+
+The node capacity (how much space Garage may use for files) is set by `GARAGE_NODE_CAPACITY` in `.env` (`1G` by default). More about layouts: <https://garagehq.deuxfleurs.fr/documentation/quick-start/#creating-a-cluster-layout>
+
+---
+
+## Access via Tailscale (VPN)
+
+If kvault runs on a home machine or laptop without a public IP and domain, the simplest and safest option is to expose it **only inside a tailnet** via [Tailscale](https://tailscale.com). Tailscale creates a private WireGuard network: only your trusted devices see the service, nothing sticks out to the internet. This is the recommended way for personal hosting and a concrete implementation of the [SECURITY.md](./SECURITY.md) requirement "do not expose the service to the open internet".
+
+Install Tailscale on the server **and** on the devices you'll connect from, and authenticate:
+
+```bash
+# on the server
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 
-# узнать tailnet-адрес сервера (вида 100.x.y.z)
+# find the server's tailnet address (looks like 100.x.y.z)
 tailscale ip -4
 ```
 
-Дальше — два варианта.
+From here — two options.
 
-### Вариант 1. Обычный HTTP по тайлнету (просто)
+### Option 1. Plain HTTP over the tailnet (simple)
 
-Привяжите публикуемые порты к **tailnet-адресу** сервера. Тогда контейнеры слушают только на интерфейсе Tailscale — в локальной сети и наружу они недоступны:
+Bind the published ports to the server's **tailnet address**. The containers then listen only on the Tailscale interface — they are unreachable from the local network and the internet:
 
 ```bash
-# .env — подставьте свой tailnet-адрес из `tailscale ip -4` (например 100.72.84.64)
+# .env — substitute your tailnet address from `tailscale ip -4` (e.g. 100.72.84.64)
 FRONTEND_PORT=100.72.84.64:8000
 GARAGE_S3_PORT=100.72.84.64:3900
 API_CORS_ORIGINS=http://100.72.84.64:8000
 AWS_PUBLIC_ENDPOINT_URL=http://100.72.84.64:3900
 ```
 
-Перезапустите: `docker compose up -d`.
+Restart: `docker compose up -d`.
 
-Заходите с любого устройства в тайлнете по `http://100.72.84.64:8000`. Трафик внутри tailnet шифруется WireGuard, поэтому обычного HTTP достаточно; реверс-прокси и сертификаты не нужны. И фронтенд, и S3 работают по HTTP на одном адресе — проблемы [mixed content](#s3-по-https) не возникает.
+Connect from any device in the tailnet at `http://100.72.84.64:8000`. Traffic inside the tailnet is encrypted by WireGuard, so plain HTTP is sufficient; no reverse proxy or certificates needed. Both the frontend and S3 run over HTTP on the same address — no [mixed content](#s3-over-https) problem arises.
 
-### Вариант 2. HTTPS через Tailscale Serve
+### Option 2. HTTPS via Tailscale Serve
 
-Если хочется аккуратный адрес `https://<имя>.<tailnet>.ts.net` с валидным сертификатом, используйте [Tailscale Serve](https://tailscale.com/kb/1242/tailscale-serve). В админке tailnet включите **MagicDNS** и **HTTPS Certificates**.
+If you want a neat `https://<name>.<tailnet>.ts.net` address with a valid certificate, use [Tailscale Serve](https://tailscale.com/kb/1242/tailscale-serve). Enable **MagicDNS** and **HTTPS Certificates** in the tailnet admin console.
 
-Привяжите порты контейнеров к localhost — наружу их отдаёт уже Tailscale Serve:
+Bind the container ports to localhost — Tailscale Serve exposes them outward:
 
 ```bash
-# .env — порты только на localhost
+# .env — ports on localhost only
 FRONTEND_PORT=127.0.0.1:8000
 GARAGE_S3_PORT=127.0.0.1:3900
-API_CORS_ORIGINS=https://<имя>.<tailnet>.ts.net
-AWS_PUBLIC_ENDPOINT_URL=https://<имя>.<tailnet>.ts.net:3900
+API_CORS_ORIGINS=https://<name>.<tailnet>.ts.net
+AWS_PUBLIC_ENDPOINT_URL=https://<name>.<tailnet>.ts.net:3900
 ```
 
-Перезапустите (`docker compose up -d`) и поднимите Serve для фронтенда и S3:
+Restart (`docker compose up -d`) and bring up Serve for the frontend and S3:
 
 ```bash
-tailscale serve --bg --https=443  http://127.0.0.1:8000   # фронтенд
+tailscale serve --bg --https=443  http://127.0.0.1:8000   # frontend
 tailscale serve --bg --https=3900 http://127.0.0.1:3900   # Garage S3
 ```
 
-S3 публикуется на собственном HTTPS-порту `3900`, поэтому presigned-ссылки остаются валидными без переписывания пути. И фронтенд, и хранилище работают по HTTPS — [mixed content](#s3-по-https) не возникает. Проверить активные маршруты: `tailscale serve status`.
+S3 is published on its own HTTPS port `3900`, so presigned URLs remain valid without path rewriting. Both the frontend and the storage run over HTTPS — no [mixed content](#s3-over-https). Check active routes: `tailscale serve status`.
 
 ---
 
-## Доступ по своему домену
+## Access via your own domain
 
-Как именно настраивать домен, зависит от того, открываете ли вы kvault напрямую или через реверс-прокси.
+How exactly to set up the domain depends on whether you expose kvault directly or through a reverse proxy.
 
-### Вариант А. Прямой доступ (без прокси)
+### Option A. Direct access (no proxy)
 
-1. Направьте A-запись домена на IP сервера.
-2. В `.env` укажите домен в списке разрешённых источников:
+1. Point the domain's A record at the server's IP.
+2. In `.env`, add the domain to the allowed origins:
    ```bash
    API_CORS_ORIGINS=http://kvault.example.com
    ```
-3. Перезапустите: `docker compose up -d`.
+3. Restart: `docker compose up -d`.
 
-kvault откроется по `http://kvault.example.com`. Подходит для теста, но **без HTTPS** — для боевого использования предпочтителен следующий вариант.
+kvault opens at `http://kvault.example.com`. Fine for testing, but **without HTTPS** — for real use the next option is preferred.
 
-### Вариант Б. Через реверс-прокси (рекомендуется)
+### Option B. Through a reverse proxy (recommended)
 
-Этот вариант даёт HTTPS и аккуратный доступ по поддомену — см. следующий раздел.
+This option gives you HTTPS and clean subdomain access — see the next section.
 
-> **Как фронтенд находит API.** Внутри развёртывания фронтенд сам проксирует запросы `/api/` на сервис API по внутренней сети Docker. Поэтому браузеру и вашему реверс-прокси достаточно «знать» **только адрес фронтенда** — API отдельно публиковать наружу не нужно.
+> **How the frontend finds the API.** Within the deployment, the frontend itself proxies `/api/` requests to the API service over the internal Docker network. So the browser and your reverse proxy only need to "know" **the frontend's address** — the API doesn't need to be published separately.
 
 ---
 
-## Реверс-прокси на поддомен (с HTTPS)
+## Reverse proxy on a subdomain (with HTTPS)
 
-Сценарий: kvault должен открываться по `https://kvault.example.com`, а сам контейнер фронтенда слушает локальный порт на сервере.
+Scenario: kvault should open at `https://kvault.example.com`, while the frontend container listens on a local port on the server.
 
-**1. Освободите порт `80` для прокси** и переведите фронтенд на другой порт хоста — в `.env`:
+**1. Free up port `80` for the proxy** and move the frontend to a different host port — in `.env`:
 
 ```bash
 FRONTEND_PORT=8081
 API_CORS_ORIGINS=https://kvault.example.com
 ```
 
-Перезапустите: `docker compose up -d`. Теперь контейнер фронтенда доступен локально на `http://localhost:8081`.
+Restart: `docker compose up -d`. The frontend container is now available locally at `http://localhost:8081`.
 
-**2. Настройте реверс-прокси.** Пример для nginx (`/etc/nginx/sites-available/kvault`):
+**2. Configure the reverse proxy.** Example for nginx (`/etc/nginx/sites-available/kvault`):
 
 ```nginx
 server {
     listen 80;
     server_name kvault.example.com;
 
-    # Файлы могут быть крупными — поднимаем лимит тела запроса
+    # Files can be large — raise the request body limit
     client_max_body_size 100M;
 
     location / {
@@ -263,55 +228,55 @@ server {
 }
 ```
 
-**3. Добавьте HTTPS.** Проще всего через Let's Encrypt:
+**3. Add HTTPS.** Easiest via Let's Encrypt:
 
 ```bash
 sudo certbot --nginx -d kvault.example.com
 ```
 
-Certbot сам пропишет TLS-сертификат и редирект с HTTP на HTTPS.
+Certbot installs the TLS certificate and the HTTP-to-HTTPS redirect on its own.
 
-> **Не забудьте про `API_CORS_ORIGINS`.** Значение должно **точно** совпадать со схемой и хостом, по которым открывается сайт. Если перешли на HTTPS — укажите `https://kvault.example.com`. Несовпадение приведёт к ошибкам CORS в браузере.
+> **Don't forget `API_CORS_ORIGINS`.** The value must match the scheme and host the site opens at **exactly**. If you switched to HTTPS — set `https://kvault.example.com`. A mismatch leads to CORS errors in the browser.
 
-> **При переходе фронтенда на HTTPS, хранилище S3 тоже должно быть переведено на HTTPS для предотвращения mixed content.** См. пример ниже.
+> **When the frontend moves to HTTPS, the S3 storage must move to HTTPS too** to prevent mixed content. See the example below.
 
 ---
 
-## Загрузка файлов и presigned-ссылки
+## File uploads and presigned URLs
 
-Скачивание и просмотр файлов работают через **presigned-ссылки** на хранилище Garage: API формирует временную ссылку, а **браузер пользователя** идёт по ней напрямую в хранилище. Поэтому адрес хранилища в такой ссылке должен быть **доступен из браузера**, а не только внутри Docker.
+Downloading and viewing files works through **presigned URLs** to the Garage storage: the API produces a temporary URL, and the **user's browser** follows it straight to the storage. The storage address in such a URL must therefore be **reachable from the browser**, not just inside Docker.
 
-За это отвечает `AWS_PUBLIC_ENDPOINT_URL`. Укажите в нём **публичный** адрес сервера и порт Garage:
+`AWS_PUBLIC_ENDPOINT_URL` is responsible for this. Set it to the server's **public** address and the Garage port:
 
 ```bash
-# Порт должен совпадать с GARAGE_S3_PORT (по умолчанию 3900)
+# The port must match GARAGE_S3_PORT (3900 by default)
 AWS_PUBLIC_ENDPOINT_URL=http://kvault.example.com:3900
 ```
 
-При этом:
+Note that:
 
-- `AWS_ENDPOINT_URL` (внутренний адрес, `http://garage:3900`) **менять не нужно** — по нему API общается с Garage внутри сети Docker.
-- Порт `GARAGE_S3_PORT` (по умолчанию `3900`) должен быть **открыт наружу** на сервере, чтобы браузеры могли скачивать файлы.
+- `AWS_ENDPOINT_URL` (the internal address, `http://garage:3900`) **must not be changed** — the API uses it to talk to Garage inside the Docker network.
+- The `GARAGE_S3_PORT` port (`3900` by default) must be **open to the outside** on the server so browsers can download files.
 
-### S3 по HTTPS
+### S3 over HTTPS
 
-> **Почему это вообще нужно.** Если фронтенд открывается по **HTTPS**, а `AWS_PUBLIC_ENDPOINT_URL` указывает на **HTTP** (`http://194.0.2.10:3900`), браузер заблокирует переход по presigned-ссылке как **mixed content** — файлы перестанут скачиваться и загружаться.
+> **Why this is needed at all.** If the frontend opens over **HTTPS** while `AWS_PUBLIC_ENDPOINT_URL` points to **HTTP** (`http://194.0.2.10:3900`), the browser blocks the presigned URL as **mixed content** — files stop downloading and uploading.
 
-Самый простой способ перевести S3 на HTTPS без отдельного поддомена — проксировать Garage на **префиксе пути** того же домена, на котором уже работает фронтенд. Браузер ходит на `https://kvault.example.com/<бакет>/...`, nginx терминирует TLS и проксирует на локальный Garage.
+The simplest way to move S3 to HTTPS without a separate subdomain is to proxy Garage on a **path prefix** of the same domain the frontend already runs on. The browser goes to `https://kvault.example.com/<bucket>/...`, nginx terminates TLS and proxies to the local Garage.
 
-**1. В `.env`** укажите публичный адрес без порта (имя бакета попадёт в путь автоматически):
+**1. In `.env`**, set the public address without a port (the bucket name lands in the path automatically):
 
 ```bash
 AWS_S3_BUCKET=kvault-bucket
 AWS_PUBLIC_ENDPOINT_URL=https://kvault.example.com
 ```
 
-**2. В конфиге nginx** добавьте `location` для бакета в тот же `server`-блок на `443`, где проксируется фронтенд:
+**2. In the nginx config**, add a `location` for the bucket to the same `server` block on `443` that proxies the frontend:
 
 ```nginx
 # HTTP → HTTPS
 server {
-    # Автоматически сгенерировано certbot
+    # Generated automatically by certbot
     listen 80;
     server_name kvault.example.com;
     return 301 https://$host$request_uri;
@@ -321,15 +286,15 @@ server {
     listen 443 ssl;
     server_name kvault.example.com;
 
-    # Автоматически сгенерировано certbot
+    # Generated automatically by certbot
     ssl_certificate     /etc/letsencrypt/live/kvault.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kvault.example.com/privkey.pem;
 
-    # Файлы могут быть крупными — поднимаем лимит тела запроса
+    # Files can be large — raise the request body limit
     client_max_body_size 100M;
 
     location / {
-        proxy_pass http://localhost:8081;          # контейнер фронтенда
+        proxy_pass http://localhost:8081;          # frontend container
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
@@ -337,138 +302,139 @@ server {
     }
 
     location /kvault-bucket/ {
-        proxy_pass http://localhost:3900;           # локальный Garage S3
+        proxy_pass http://localhost:3900;           # local Garage S3
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Обязательно для chunked-загрузок в S3:
-        # иначе nginx буферизует тело и Garage отвергает запрос
+        # Required for chunked S3 uploads:
+        # otherwise nginx buffers the body and Garage rejects the request
         proxy_buffering off;
         proxy_request_buffering off;
     }
 }
 ```
 
-При этом:
+Note that:
 
-- Путь в `location` (`/kvault-bucket/`) должен **совпадать с именем бакета** `AWS_S3_BUCKET` — presigned-ссылка имеет вид `https://kvault.example.com/kvault-bucket/<ключ>?...`.
-- Порт `3900` **не нужно** открывать наружу: браузер ходит на `443`, а Garage слушает только локально.
-- `proxy_buffering off` / `proxy_request_buffering off` критичны для загрузки файлов (chunked upload).
+- The `location` path (`/kvault-bucket/`) must **match the bucket name** `AWS_S3_BUCKET` — a presigned URL looks like `https://kvault.example.com/kvault-bucket/<key>?...`.
+- Port `3900` does **not** need to be open to the outside: the browser goes to `443`, and Garage listens only locally.
+- `proxy_buffering off` / `proxy_request_buffering off` are critical for file uploads (chunked upload).
 
-Готовый пример конфига — в [`deploy/nginx.example.conf`](deploy/nginx.example.conf).
+A ready-made example config is in [`deploy/nginx.example.conf`](deploy/nginx.example.conf).
 
 ---
 
-## Справочник переменных .env
+## .env variable reference
 
-### Общие
+### General
 
-| Переменная             | По умолчанию       | Описание                                                                                                                                                                                                             |
-| ---------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KVAULT_VERSION`       | `main`             | Версия для сборки: git-тег, ветка или коммит (напр. `v1.0.0`).                                                                                                                                                       |
-| `KVAULT_REPO`          | GitHub             | Репозиторий проекта (бэкенд и фронтенд). Переопределяйте, только если используете зеркало (напр. GitVerse).                                                                                                          |
-| `DEBUG`                | `false`            | Режим отладки — в продакшене держите `false`.                                                                                                                                                                        |
-| `API_PORT`             | `6767`             | Порт API **внутри** сети Docker. Наружу обычно не публикуется.                                                                                                                                                       |
-| `FRONTEND_PORT`        | `80`               | Порт фронтенда **на хосте**. Поменяйте при работе за реверс-прокси. Можно указать в форме `IP:порт`, чтобы слушать только на одном интерфейсе — напр. tailnet-адресе (см. [Tailscale](#доступ-через-tailscale-vpn)). |
-| `GARAGE_S3_PORT`       | `3900`             | Порт Garage S3 на хосте. Должен совпадать с портом в `AWS_PUBLIC_ENDPOINT_URL`. Тоже поддерживает форму `IP:порт`.                                                                                                   |
-| `API_CORS_ORIGINS`     | `http://localhost` | Публичный адрес фронтенда. Несколько — через запятую: `http://a.com,https://a.com`.                                                                                                                                  |
+| Variable               | Default            | Description                                                                                                                                                                                                     |
+| ---------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KVAULT_VERSION`       | `latest`           | Docker image tag: `latest` (latest release), `v1.0.0` / `1.0` (specific version), or `edge` (latest `main` commit).                                                                                             |
+| `DEBUG`                | `false`            | Debug mode — keep `false` in production.                                                                                                                                                                        |
+| `API_PORT`             | `6767`             | API port **inside** the Docker network. Usually not published externally.                                                                                                                                       |
+| `FRONTEND_PORT`        | `80`               | Frontend port **on the host**. Change it when running behind a reverse proxy. Can be given as `IP:port` to listen on a single interface only — e.g. a tailnet address (see [Tailscale](#access-via-tailscale-vpn)). |
+| `GARAGE_S3_PORT`       | `3900`             | Garage S3 port on the host. Must match the port in `AWS_PUBLIC_ENDPOINT_URL`. Also supports the `IP:port` form.                                                                                                 |
+| `API_CORS_ORIGINS`     | `http://localhost` | The frontend's public address. Multiple — comma-separated: `http://a.com,https://a.com`.                                                                                                                        |
 
-### База данных (PostgreSQL)
+### Database (PostgreSQL)
 
-| Переменная    | По умолчанию | Описание                        |
-| ------------- | ------------ | ------------------------------- |
-| `DB_HOST`     | `pg`         | Хост БД (имя сервиса в Docker). |
-| `DB_PORT`     | `5432`       | Порт БД.                        |
-| `DB_DATABASE` | `kvault`     | Имя базы.                       |
-| `DB_USERNAME` | `postgres`   | Пользователь.                   |
-| `DB_PASSWORD` | `postgres`   | **Смените на надёжный пароль.** |
+| Variable      | Default    | Description                          |
+| ------------- | ---------- | ------------------------------------ |
+| `DB_HOST`     | `pg`       | DB host (Docker service name).       |
+| `DB_PORT`     | `5432`     | DB port.                             |
+| `DB_DATABASE` | `kvault`   | Database name.                       |
+| `DB_USERNAME` | `postgres` | User.                                |
+| `DB_PASSWORD` | —          | **Generated by `setup.sh`.**         |
 
 ### Redis
 
-| Переменная       | По умолчанию | Описание                                  |
-| ---------------- | ------------ | ----------------------------------------- |
-| `REDIS_HOST`     | `redis`      | Хост Redis.                               |
-| `REDIS_PORT`     | `6379`       | Порт Redis.                               |
-| `REDIS_USER`     | `redis`      | Пользователь.                             |
-| `REDIS_PASSWORD` | `redis`      | **Смените на надёжный пароль.**           |
-| `REDIS_QUEUE_DB` | `0`          | Номер БД Redis под очередь фоновых задач. |
-| `REDIS_CACHE_DB` | `1`          | Номер БД Redis под кэш.                   |
+| Variable         | Default | Description                              |
+| ---------------- | ------- | ---------------------------------------- |
+| `REDIS_HOST`     | `redis` | Redis host.                              |
+| `REDIS_PORT`     | `6379`  | Redis port.                              |
+| `REDIS_USER`     | `redis` | User.                                    |
+| `REDIS_PASSWORD` | —       | **Generated by `setup.sh`.**             |
+| `REDIS_QUEUE_DB` | `0`     | Redis DB number for the background task queue. |
+| `REDIS_CACHE_DB` | `1`     | Redis DB number for the cache.           |
 
-### Кэш
+### Cache
 
-| Переменная            | По умолчанию | Описание                    |
-| --------------------- | ------------ | --------------------------- |
-| `CACHE_ENABLED`       | `true`       | Включить кэширование.       |
-| `CACHE_ITEMS_TTL`     | `5m`         | Время жизни кэша заметок.   |
-| `CACHE_FILES_TTL`     | `10m`        | Время жизни кэша файлов.    |
-| `CACHE_TAGS_TTL`      | `15m`        | Время жизни кэша тегов.     |
-| `CACHE_STOPWORDS_TTL` | `30m`        | Время жизни кэша стоп-слов. |
+| Variable              | Default | Description              |
+| --------------------- | ------- | ------------------------ |
+| `CACHE_ENABLED`       | `true`  | Enable caching.          |
+| `CACHE_ITEMS_TTL`     | `5m`    | Notes cache TTL.         |
+| `CACHE_FILES_TTL`     | `10m`   | Files cache TTL.         |
+| `CACHE_TAGS_TTL`      | `15m`   | Tags cache TTL.          |
+| `CACHE_STOPWORDS_TTL` | `30m`   | Stopwords cache TTL.     |
 
-### Хранилище (Garage / S3)
+### Storage (Garage / S3)
 
-| Переменная                | По умолчанию            | Описание                                                                  |
-| ------------------------- | ----------------------- | ------------------------------------------------------------------------- |
-| `AWS_ACCESS_KEY_ID`       | —                       | Access Key из Garage (см. [шаг 4](#шаг-4-настройка-хранилища-garage-s3)). |
-| `AWS_SECRET_ACCESS_KEY`   | —                       | Secret Key из Garage.                                                     |
-| `AWS_REGION`              | `garage`                | Регион — с Garage не менять.                                              |
-| `AWS_ENDPOINT_URL`        | `http://garage:3900`    | **Внутренний** адрес S3 — не менять при использовании Garage.             |
-| `AWS_S3_BUCKET`           | `kvault-bucket`         | Имя бакета.                                                               |
-| `AWS_URL_EXPIRATION`      | `60s`                   | Срок жизни ссылки на скачивание.                                          |
-| `AWS_VIEW_URL_EXPIRATION` | `24h`                   | Срок жизни ссылки на просмотр.                                            |
-| `AWS_PUBLIC_ENDPOINT_URL` | `http://localhost:3900` | **Публичный** адрес S3 — встраивается в ссылки на файлы для браузера.     |
+| Variable                  | Default                 | Description                                                              |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------ |
+| `GARAGE_RPC_SECRET`       | —                       | Garage cluster RPC secret (`openssl rand -hex 32`).                      |
+| `GARAGE_NODE_CAPACITY`    | `1G`                    | How much space Garage may use for files.                                 |
+| `AWS_ACCESS_KEY_ID`       | —                       | Access Key (`GK` + 24 hex); imported into Garage automatically (see [step 4](#step-4-garage-storage-s3)). |
+| `AWS_SECRET_ACCESS_KEY`   | —                       | Secret Key (64 hex); imported together with the Access Key.              |
+| `AWS_REGION`              | `garage`                | Region — do not change with Garage.                                      |
+| `AWS_ENDPOINT_URL`        | `http://garage:3900`    | **Internal** S3 address — do not change when using Garage.               |
+| `AWS_S3_BUCKET`           | `kvault-bucket`         | Bucket name.                                                             |
+| `AWS_URL_EXPIRATION`      | `60s`                   | Download URL lifetime.                                                   |
+| `AWS_VIEW_URL_EXPIRATION` | `24h`                   | View URL lifetime.                                                       |
+| `AWS_PUBLIC_ENDPOINT_URL` | `http://localhost:3900` | **Public** S3 address — embedded into file URLs for the browser.         |
 
-### Воркер
+### Worker
 
-| Переменная                | По умолчанию | Описание                                                                                  |
-| ------------------------- | ------------ | ----------------------------------------------------------------------------------------- |
-| `WORKER_CONCURRENT_TASKS` | `10`         | Число одновременно обрабатываемых фоновых задач (извлечение текста из PDF и веб-страниц). |
-| `WORKER_MAX_RETRIES`      | `3`          | Максимум повторных попыток упавшей фоновой задачи.                                        |
-| `WORKER_RETRY_TIMEOUT`    | `5m`         | Дедлайн одной попытки; при превышении задача повторяется.                                 |
+| Variable                  | Default | Description                                                                       |
+| ------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `WORKER_CONCURRENT_TASKS` | `10`    | Number of background tasks processed concurrently (PDF and web page text extraction). |
+| `WORKER_MAX_RETRIES`      | `3`     | Maximum retries for a failed background task.                                       |
+| `WORKER_RETRY_TIMEOUT`    | `5m`    | Deadline for one attempt; the task is retried when exceeded.                        |
 
-### Аутентификация
+### Authentication
 
-| Переменная         | По умолчанию | Описание                                                                                             |
-| ------------------ | ------------ | ---------------------------------------------------------------------------------------------------- |
-| `AUTH_API_KEY_TTL` | `720h`       | Срок жизни API-ключа. Окно скользящее: ключ истекает через это время после последнего использования. |
+| Variable           | Default | Description                                                                                 |
+| ------------------ | ------- | --------------------------------------------------------------------------------------------- |
+| `AUTH_API_KEY_TTL` | `720h`  | API key lifetime. The window is sliding: a key expires this long after its last use.        |
 
 ---
 
-## Обновление и обслуживание
+## Updates and maintenance
 
-**Выбор версии.** Версию задаёт `KVAULT_VERSION` в `.env`. Для воспроизводимого развёртывания фиксируйте конкретный тег:
+**Choosing a version.** The version is set by `KVAULT_VERSION` in `.env` — it's a Docker image tag:
+
+- `latest` (default) — the latest release;
+- `v1.0.0` or `1.0` — a specific version. Pin it for reproducible deployments;
+- `edge` — the latest commit of the `main` branch (for the brave).
+
+The version list is in the repository's Releases section.
+
+**Update:**
 
 ```bash
-# .env
-KVAULT_VERSION=v0.1.0
+docker compose pull
+docker compose up -d
 ```
 
-Значение `main` (по умолчанию) собирает последнее состояние кода. Список версий — в разделе Releases репозитория.
+`pull` downloads fresh images for the selected tag, `up -d` restarts the containers that changed. New DB migrations apply automatically on startup (the `migrate` container).
 
-**Обновить / пересобрать:**
+> Rolling back to a previous version: restore the previous `KVAULT_VERSION` and run `docker compose pull && docker compose up -d` again. Only the images roll back — DB migrations are not reverted, so rollbacks between minor versions are usually safe; across major versions, check the changelog.
 
-```bash
-docker compose up -d --build
-```
+**Backups.** Data lives in two places: the PostgreSQL database (notes, tags, stopwords, users) and the Garage storage (uploaded files). Always keep the `.env` file as well — it contains the passwords and access keys.
 
-Команда заново скачивает исходники нужной версии и пересобирает образы. Новые миграции БД применятся автоматически при старте (контейнер `migrate`).
-
-> Откат к прежней версии: верните прежний `KVAULT_VERSION` и снова выполните `docker compose up -d --build`.
-
-**Резервное копирование.** Данные лежат в двух местах: база PostgreSQL (заметки, теги, стоп-слова, пользователи) и хранилище Garage (загруженные файлы). Всегда сохраняйте также сам файл `.env` — в нём пароли и ключи доступа.
-
-База PostgreSQL бэкапится «на лету», останавливать её не нужно:
+The PostgreSQL database can be backed up live, no need to stop it:
 
 ```bash
 docker exec kvault_pg pg_dump -U postgres kvault > kvault-backup.sql
 ```
 
-Файлы Garage — в зависимости от того, как смонтировано хранилище.
+Garage files — depending on how the storage is mounted.
 
-> **Останавливайте Garage перед копированием.** Каталоги `meta`/`data` — это активная база; копия «на ходу» может оказаться несогласованной. `docker compose stop garage` → копирование → `docker compose start garage`.
+> **Stop Garage before copying.** The `meta`/`data` directories are a live database; an in-flight copy may end up inconsistent. `docker compose stop garage` → copy → `docker compose start garage`.
 
-**Именованные тома (по умолчанию).** Garage хранит данные в томах `garage_meta` и `garage_data`. Упаковать их в архив:
+**Named volumes (default).** Garage keeps data in the `garage_meta` and `garage_data` volumes. To pack them into an archive:
 
 ```bash
 docker compose stop garage
@@ -477,17 +443,20 @@ docker run --rm -v garage_meta:/m -v garage_data:/d -v "$PWD:/backup" \
 docker compose start garage
 ```
 
-**Bind-mount каталоги (удобнее для бэкапов).** Если хранить файлы Garage в обычных каталогах рядом с `docker-compose.yml`, бэкап сводится к копированию папки. Замените в `docker-compose.yml` тома Garage на bind-mount:
+**Bind-mount directories (easier for backups).** If you keep Garage files in plain directories next to `docker-compose.yml`, a backup is just copying a folder. Replace the Garage volumes in `docker-compose.yml` with bind mounts:
 
 ```yaml
 garage:
   volumes:
-    - "./docker/garage/garage.toml:/etc/garage.toml"
     - ./data/garage/meta:/var/lib/garage/meta
     - ./data/garage/data:/var/lib/garage/data
+
+garage-init:
+  volumes:
+    - ./data/garage/meta:/var/lib/garage/meta
 ```
 
-и уберите `garage_meta` / `garage_data` из верхнего блока `volumes:`. Если разворачивание уже работает на томах, один раз перенесите данные: остановите Garage и скопируйте содержимое старых томов в `./data/garage/`. Дальше бэкап — обычный архив каталога:
+(the `meta` directory is also needed by the `garage-init` service — it reads the node key from there) and remove `garage_meta` / `garage_data` from the top-level `volumes:` block. If the deployment is already running on volumes, migrate the data once: stop Garage and copy the contents of the old volumes into `./data/garage/`. From then on a backup is a plain directory archive:
 
 ```bash
 docker compose stop garage
@@ -495,28 +464,28 @@ tar czf garage-backup.tar.gz ./data/garage
 docker compose start garage
 ```
 
-**Остановить / запустить:**
+**Stop / start:**
 
 ```bash
-docker compose down      # остановить (тома сохраняются)
-docker compose up -d     # запустить снова
+docker compose down      # stop (volumes are preserved)
+docker compose up -d     # start again
 ```
 
 ---
 
-## Решение частых проблем
+## Troubleshooting
 
-**В браузере ошибки CORS, интерфейс не загружает данные.**
-`API_CORS_ORIGINS` не совпадает с адресом сайта. Проверьте схему (`http`/`https`) и хост — они должны совпадать с тем, что в адресной строке. После правки `.env` выполните `docker compose up -d`.
+**CORS errors in the browser, the UI doesn't load data.**
+`API_CORS_ORIGINS` doesn't match the site address. Check the scheme (`http`/`https`) and host — they must match what's in the address bar. After editing `.env`, run `docker compose up -d`.
 
-**Файлы загружаются, но не скачиваются / не открываются.**
-Неверный `AWS_PUBLIC_ENDPOINT_URL` или закрыт порт Garage. Адрес должен быть доступен **из браузера**, а порт `GARAGE_S3_PORT` — открыт наружу. См. [presigned-ссылки](#загрузка-файлов-и-presigned-ссылки).
+**Files upload but don't download / open.**
+Wrong `AWS_PUBLIC_ENDPOINT_URL` or the Garage port is closed. The address must be reachable **from the browser**, and the `GARAGE_S3_PORT` port must be open to the outside. See [presigned URLs](#file-uploads-and-presigned-urls).
 
-**При загрузке файла — ошибка о размере / `413`.**
-Поднимите лимит тела запроса в реверс-прокси (`client_max_body_size` для nginx).
+**A size error / `413` when uploading a file.**
+Raise the request body limit in the reverse proxy (`client_max_body_size` for nginx).
 
-**Загрузка файла проходит, но из него не извлекается текст.**
-Убедитесь, что запущен контейнер `kvault_worker` (`docker compose ps`) — извлечение текста из PDF выполняет фоновый воркер. Из PDF без текстового слоя (сканы-картинки) текст извлечь нельзя.
+**A file uploads, but no text is extracted from it.**
+Make sure the `kvault_worker` container is running (`docker compose ps`) — PDF text extraction is done by the background worker. Text can't be extracted from PDFs without a text layer (scanned images).
 
-**Файлы вообще не загружаются после установки.**
-Скорее всего, не пройден [шаг 4](#шаг-4-настройка-хранилища-garage-s3): не инициализирован Garage или не заданы ключи `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+**Files don't upload at all after installation.**
+Check that Garage initialization succeeded: `docker compose logs garage-init` (should end with `garage-init: done`). Common causes: `GARAGE_RPC_SECRET`, `AWS_ACCESS_KEY_ID`, or `AWS_SECRET_ACCESS_KEY` not set, or `AWS_ACCESS_KEY_ID` not in the `GK` + 24 hex format. Fix `.env` and run `docker compose up -d`. See [step 4](#step-4-garage-storage-s3).
