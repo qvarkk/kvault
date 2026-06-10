@@ -1,0 +1,5 @@
+*.log
+.env
+.vscode
+tmp
+CLAUDE.md

@@ -71,7 +71,9 @@ type AuthConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
-	_ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		_ = godotenv.Load("../.env")
+	}
 
 	var cfg Config
 
