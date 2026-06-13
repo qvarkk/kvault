@@ -19,6 +19,11 @@ jobs:
         with:
           go-version: stable
           cache-dependency-path: backend/go.sum
+      - name: Generate swagger docs
+        working-directory: backend
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+          swag init --dir ./cmd/api,./internal/httpx,./internal/handlers/web --output ./docs
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
