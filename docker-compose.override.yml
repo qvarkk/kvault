@@ -6,3 +6,11 @@ services:
   api:
     build:
       context: ./backend
+
+  pg:
+    ports:
+      - "${DB_PORT}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT}:6379"

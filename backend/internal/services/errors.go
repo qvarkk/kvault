@@ -22,19 +22,11 @@ var (
 	ErrFileNotCreated = errors.New("service: failed to create file")
 	ErrFileNotFound   = errors.New("service: file was not found")
 
-	ErrStopwordNotCreated    = errors.New("service: failed to create stopword")
-	ErrStopwordAlreadyExists = errors.New("service: stopword already exists")
-	ErrStopwordNotFound      = errors.New("service: stopword was not found")
-
 	ErrTagNotCreated    = errors.New("service: failed to create tag")
 	ErrTagNotFound      = errors.New("service: tag was not found")
 	ErrTagAlreadyExists = errors.New("service: tag already exists")
 
 	ErrPdfFileFormat = errors.New("services: provided file has to be a PDF file")
-
-	ErrInsufficientContent = errors.New("service: insufficient content for autotagging")
-
-	ErrUrlRequired = errors.New("service: source_url is required for url items")
 )
 
 type ServiceError struct {

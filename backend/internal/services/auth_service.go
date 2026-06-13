@@ -49,8 +49,6 @@ func NewAuthService(userRepo AuthUserRepo, keyRepo AuthApiKeyRepo, keyTtl time.D
 	return &AuthService{userRepo: userRepo, keyRepo: keyRepo, keyTtl: keyTtl}
 }
 
-// GenerateApiKey produces a fresh CSPRNG API key and returns the plaintext (to
-// be shown to the caller once) along with the hash that was verified unique.
 func (a *AuthService) GenerateApiKey(ctx context.Context) (plaintext, hash string, err error) {
 	for {
 		plaintext, hash, err = GenerateApiKey()
@@ -101,8 +99,6 @@ func (a *AuthService) RegisterNewUser(
 	return user, plaintextKey, nil
 }
 
-// VerifyCredentials authenticates by password and, on success, issues a fresh
-// per-device API key without touching the user's other keys.
 func (a *AuthService) VerifyCredentials(
 	ctx context.Context,
 	username string,
@@ -132,7 +128,6 @@ func (a *AuthService) VerifyCredentials(
 	return user, plaintextKey, nil
 }
 
-// issueKey generates a fresh key and persists it as a new api_keys row.
 func (a *AuthService) issueKey(ctx context.Context, userID, label string) (string, error) {
 	plaintextKey, keyHash, err := a.GenerateApiKey(ctx)
 	if err != nil {
@@ -174,7 +169,6 @@ func (a *AuthService) DeleteKey(ctx context.Context, userID, keyID string) error
 	return nil
 }
 
-// Logout invalidates the caller's current key server-side.
 func (a *AuthService) Logout(ctx context.Context, userID, keyID string) error {
 	if err := a.keyRepo.DeleteByID(ctx, keyID, userID); err != nil {
 		return NewServiceError(ErrInternal, "failed to log out", err)
@@ -182,7 +176,6 @@ func (a *AuthService) Logout(ctx context.Context, userID, keyID string) error {
 	return nil
 }
 
-// LogoutOthers invalidates every key for the user except the current one.
 func (a *AuthService) LogoutOthers(ctx context.Context, userID, keyID string) error {
 	if err := a.keyRepo.DeleteByUserExcept(ctx, userID, keyID); err != nil {
 		return NewServiceError(ErrInternal, "failed to log out other devices", err)

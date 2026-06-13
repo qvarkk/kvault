@@ -11,7 +11,6 @@ import (
 
 type ItemTagsByID map[string][]domain.Tag
 
-// tagSortColumns whitelists sortable columns for tags.
 var tagSortColumns = map[string]string{
 	"name":       "t.name",
 	"created_at": "t.created_at",

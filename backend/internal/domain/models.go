@@ -6,11 +6,10 @@ import (
 )
 
 type (
-	FileStatus     string
-	ItemType       string
-	UrlStatus      string
-	TagSource      string
-	StopwordSource string
+	FileStatus string
+	ItemType   string
+	UrlStatus  string
+	TagSource  string
 )
 
 const (
@@ -34,11 +33,6 @@ const (
 const (
 	TagSourceAuto   TagSource = "auto"
 	TagSourceManual TagSource = "manual"
-)
-
-const (
-	StopwordSourceDefault StopwordSource = "default"
-	StopwordSourceUser    StopwordSource = "user"
 )
 
 type User struct {
@@ -101,15 +95,6 @@ type Tag struct {
 	UpdatedAt time.Time `db:"updated_at"`
 	Source    TagSource `db:"source"`
 	ItemCount int       `db:"item_count"`
-}
-
-type Stopword struct {
-	Word      string         `db:"word"`
-	UserID    string         `db:"user_id"`
-	Source    StopwordSource `db:"source"`
-	IsEnabled bool           `db:"is_enabled"`
-	CreatedAt time.Time      `db:"created_at"`
-	UpdatedAt time.Time      `db:"updated_at"`
 }
 
 type ItemTag struct {

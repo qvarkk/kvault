@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// touchThreshold throttles last_used_at/expires_at writes: the sliding window is
-// only advanced when the key has not been touched within this interval, so a
-// burst of requests does not write on every call.
 const touchThreshold = time.Minute
 
 type UserRepo interface {

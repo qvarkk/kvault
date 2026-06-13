@@ -19,10 +19,8 @@ type ItemService interface {
 	PermanentlyDeleteByID(ctx context.Context, itemID, userID string) error
 	Update(context.Context, services.UpdateItemInput) (*domain.Item, error)
 	RestoreByID(ctx context.Context, itemID, userID string) error
-	BindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
-	UnbindTagByItemID(ctx context.Context, itemID, tagID, userID string) error
-	Autotag(ctx context.Context, itemID, userID string, count int) ([]domain.Tag, error)
-	RefetchUrl(ctx context.Context, itemID, userID string) error
+	AttachTagByItemID(ctx context.Context, itemID, tagID, userID string) error
+	DetachTagByItemID(ctx context.Context, itemID, tagID, userID string) error
 }
 
 type ItemHandler struct {
@@ -36,7 +34,6 @@ func NewItemHandler(itemService ItemService) *ItemHandler {
 }
 
 type createItemRequest struct {
-	Type      string `json:"type" binding:"required,oneof=text url"`
 	Title     string `json:"title" binding:"required" example:"Example title"`
 	Content   string `json:"content" example:"Some content blah blah."`
 	SourceURL string `json:"source_url" binding:"omitempty,url" example:"https://example.com/article"`
@@ -44,7 +41,6 @@ type createItemRequest struct {
 
 type listItemQuery struct {
 	Query  string   `form:"q"`
-	Type   string   `form:"type" binding:"omitempty,oneof=text url"`
 	TagIDs []string `form:"tag_ids" binding:"omitempty,dive,uuid" collectionFormat:"multi"`
 	PaginationParams
 	ItemSortingParams
@@ -92,13 +88,8 @@ func (h *ItemHandler) Create(ctx *gin.Context) error {
 		return err
 	}
 
-	if req.Type == string(domain.ItemTypeUrl) && req.SourceURL == "" {
-		return services.NewServiceError(services.ErrUrlRequired, "source_url is required for url items", nil)
-	}
-
 	itemInput := services.CreateItemInput{
 		UserID:    userID,
-		Type:      req.Type,
 		Title:     req.Title,
 		Content:   req.Content,
 		SourceURL: req.SourceURL,
@@ -135,7 +126,6 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 
 	params := domain.ListItemFilter{
 		UserID: userID,
-		Type:   query.Type,
 		TagIDs: query.TagIDs,
 		QueryFilter: domain.QueryFilter{
 			Query: query.Query,
@@ -250,7 +240,7 @@ func (h *ItemHandler) Update(ctx *gin.Context) error {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{id} [delete]
-func (h *ItemHandler) Delete(ctx *gin.Context) error {
+func (h *ItemHandler) SoftDelete(ctx *gin.Context) error {
 	return h.withOwnedItemAction(ctx, h.itemService.DeleteByID)
 }
 
@@ -291,7 +281,7 @@ func (h *ItemHandler) withOwnedItemAction(
 	return nil
 }
 
-// @Summary      Bind a tag to the item
+// @Summary      Attach a tag to the item
 // @Description  Creates a binding between given item and tag
 // @Tags         Items
 // @Security     ApiKeyAuth
@@ -305,7 +295,7 @@ func (h *ItemHandler) withOwnedItemAction(
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{id}/tags [post]
-func (h *ItemHandler) BindTag(ctx *gin.Context) error {
+func (h *ItemHandler) AttachTag(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var uri itemIDUri
@@ -318,7 +308,7 @@ func (h *ItemHandler) BindTag(ctx *gin.Context) error {
 		return err
 	}
 
-	err := h.itemService.BindTagByItemID(ctx.Request.Context(), uri.ID, req.TagID, userID)
+	err := h.itemService.AttachTagByItemID(ctx.Request.Context(), uri.ID, req.TagID, userID)
 	if err != nil {
 		return err
 	}
@@ -327,7 +317,7 @@ func (h *ItemHandler) BindTag(ctx *gin.Context) error {
 	return nil
 }
 
-// @Summary      Unbind the tag from the item
+// @Summary      Remove a tag from the item
 // @Description  Deletes a binding between given item and tag
 // @Tags         Items
 // @Security     ApiKeyAuth
@@ -341,7 +331,7 @@ func (h *ItemHandler) BindTag(ctx *gin.Context) error {
 // @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/{item_id}/tags/{tag_id} [delete]
-func (h *ItemHandler) UnbindTag(ctx *gin.Context) error {
+func (h *ItemHandler) DetachTag(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	var uri unbindTagUri
@@ -349,52 +339,12 @@ func (h *ItemHandler) UnbindTag(ctx *gin.Context) error {
 		return err
 	}
 
-	err := h.itemService.UnbindTagByItemID(ctx.Request.Context(), uri.ItemID, uri.TagID, userID)
+	err := h.itemService.DetachTagByItemID(ctx.Request.Context(), uri.ItemID, uri.TagID, userID)
 	if err != nil {
 		return err
 	}
 
 	ctx.Status(http.StatusNoContent)
-	return nil
-}
-
-// @Summary      Autotag an item
-// @Description  Generates and binds up to N tags based on item content
-// @Tags         Items
-// @Security     ApiKeyAuth
-// @Accept       json
-// @Produce      json
-// @Param        id    path   string         true  "Item ID"
-// @Param        body  body   autotagRequest true  "Number of tags to generate (1-10)"
-// @Success      200   {object}  ListResponse[TagRef]
-// @Failure      401   {object}  httpx.ErrorResponse
-// @Failure      404   {object}  httpx.ErrorResponse
-// @Failure      422   {object}  httpx.ErrorResponse
-// @Failure      500   {object}  httpx.ErrorResponse
-// @Router       /items/{id}/autotag [post]
-func (h *ItemHandler) Autotag(ctx *gin.Context) error {
-	userID := ctx.MustGet("userID").(string)
-
-	var uri itemIDUri
-	if err := ctx.ShouldBindUri(&uri); err != nil {
-		return err
-	}
-
-	var req autotagRequest
-	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
-		return err
-	}
-
-	tags, err := h.itemService.Autotag(ctx.Request.Context(), uri.ID, userID, req.Number)
-	if err != nil {
-		return err
-	}
-
-	tagRefs := make([]TagRef, len(tags))
-	for i := range tags {
-		tagRefs[i] = toTagRef(&tags[i])
-	}
-	ctx.JSON(http.StatusOK, ListResponse[TagRef]{Data: tagRefs})
 	return nil
 }
 
@@ -466,7 +416,7 @@ func (h *ItemHandler) PermanentlyDelete(ctx *gin.Context) error {
 // @Failure      401   {object}  httpx.ErrorResponse
 // @Failure      500   {object}  httpx.ErrorResponse
 // @Router       /items/deleted [delete]
-func (h *ItemHandler) ClearTrash(ctx *gin.Context) error {
+func (h *ItemHandler) ClearSoftDeleted(ctx *gin.Context) error {
 	userID := ctx.MustGet("userID").(string)
 
 	if err := h.itemService.PermanentlyDeleteAllDeleted(ctx.Request.Context(), userID); err != nil {
@@ -474,32 +424,5 @@ func (h *ItemHandler) ClearTrash(ctx *gin.Context) error {
 	}
 
 	ctx.Status(http.StatusNoContent)
-	return nil
-}
-
-// @Summary      Re-fetch URL content
-// @Description  Re-enqueues a URL fetch task for a url-type item
-// @Tags         Items
-// @Security     ApiKeyAuth
-// @Param        id path string true "Item ID"
-// @Success      202
-// @Failure      401   {object}  httpx.ErrorResponse
-// @Failure      404   {object}  httpx.ErrorResponse
-// @Failure      422   {object}  httpx.ErrorResponse "Validation Error"
-// @Failure      500   {object}  httpx.ErrorResponse
-// @Router       /items/{id}/refetch [post]
-func (h *ItemHandler) Refetch(ctx *gin.Context) error {
-	userID := ctx.MustGet("userID").(string)
-
-	var uri itemIDUri
-	if err := ctx.ShouldBindUri(&uri); err != nil {
-		return err
-	}
-
-	if err := h.itemService.RefetchUrl(ctx.Request.Context(), uri.ID, userID); err != nil {
-		return err
-	}
-
-	ctx.Status(http.StatusAccepted)
 	return nil
 }

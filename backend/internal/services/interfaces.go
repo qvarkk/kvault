@@ -22,7 +22,6 @@ type FileStorage interface {
 
 type TaskEnqueuer interface {
 	EnqueuePdfProcess(ctx context.Context, userID, fileID string) error
-	EnqueueUrlFetch(ctx context.Context, userID, itemID string) error
 }
 
 type CacheStore interface {

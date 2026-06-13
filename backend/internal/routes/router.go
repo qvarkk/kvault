@@ -17,7 +17,6 @@ type HandlerServices struct {
 	AuthUser web.AuthUserService
 	Item     web.ItemService
 	File     web.FileService
-	Stopword web.StopwordService
 	Tag      web.TagService
 }
 
@@ -44,7 +43,6 @@ func SetupRouter(hs *HandlerServices, ms *MiddlewareServices, corsOrigins []stri
 	registerAuthRoutes(api, auth, web.NewAuthHandler(hs.Auth, hs.AuthUser, hs.File))
 	registerItemRoutes(api, auth, web.NewItemHandler(hs.Item))
 	registerFileRoutes(api, auth, web.NewFileHandler(hs.File))
-	registerStopwordRoutes(api, auth, web.NewStopwordHandler(hs.Stopword))
 	registerTagRoutes(api, auth, web.NewTagHandler(hs.Tag))
 
 	return r
@@ -75,18 +73,15 @@ func registerItemRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h ItemHandle
 	group.POST("", web.APIWrap(h.Create))
 	group.GET("", web.APIWrap(h.List))
 	group.GET("/deleted", web.APIWrap(h.ListDeleted))
-	group.DELETE("/deleted", web.APIWrap(h.ClearTrash))
+	group.DELETE("/deleted", web.APIWrap(h.ClearSoftDeleted))
 	group.DELETE("/deleted/:id", web.APIWrap(h.PermanentlyDelete))
 	group.GET("/:id", web.APIWrap(h.Get))
 	group.PATCH("/:id", web.APIWrap(h.Update))
-	group.DELETE("/:id", web.APIWrap(h.Delete))
+	group.DELETE("/:id", web.APIWrap(h.SoftDelete))
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
-	group.POST("/:id/autotag", web.APIWrap(h.Autotag))
 
-	group.POST("/:id/tags", web.APIWrap(h.BindTag))
-	group.DELETE("/:id/tags/:tag_id", web.APIWrap(h.UnbindTag))
-
-	group.POST("/:id/refetch", web.APIWrap(h.Refetch))
+	group.POST("/:id/tags", web.APIWrap(h.AttachTag))
+	group.DELETE("/:id/tags/:tag_id", web.APIWrap(h.DetachTag))
 }
 
 func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandler) {
@@ -101,15 +96,6 @@ func registerFileRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h FileHandle
 	group.GET("/:id/info", web.APIWrap(h.GetInfo))
 	group.DELETE("/:id", web.APIWrap(h.Delete))
 	group.POST("/:id/restore", web.APIWrap(h.Restore))
-}
-
-func registerStopwordRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h StopwordHandler) {
-	group := api.Group("/stopwords", auth)
-	group.POST("", web.APIWrap(h.Create))
-	group.GET("", web.APIWrap(h.List))
-	group.POST("/:word/enable", web.APIWrap(h.Enable))
-	group.POST("/:word/disable", web.APIWrap(h.Disable))
-	group.DELETE("/:word", web.APIWrap(h.Delete))
 }
 
 func registerTagRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, h TagHandler) {

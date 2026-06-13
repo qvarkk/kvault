@@ -21,14 +21,12 @@ type ItemHandler interface {
 	ListDeleted(*gin.Context) error
 	Get(*gin.Context) error
 	Update(*gin.Context) error
-	Delete(*gin.Context) error
+	SoftDelete(*gin.Context) error
 	Restore(*gin.Context) error
 	PermanentlyDelete(*gin.Context) error
-	ClearTrash(*gin.Context) error
-	BindTag(*gin.Context) error
-	UnbindTag(*gin.Context) error
-	Autotag(*gin.Context) error
-	Refetch(*gin.Context) error
+	ClearSoftDeleted(*gin.Context) error
+	AttachTag(*gin.Context) error
+	DetachTag(*gin.Context) error
 }
 
 type FileHandler interface {
@@ -42,14 +40,6 @@ type FileHandler interface {
 	Restore(*gin.Context) error
 	PermanentlyDelete(*gin.Context) error
 	ClearTrash(*gin.Context) error
-}
-
-type StopwordHandler interface {
-	Create(*gin.Context) error
-	List(*gin.Context) error
-	Enable(*gin.Context) error
-	Disable(*gin.Context) error
-	Delete(*gin.Context) error
 }
 
 type TagHandler interface {

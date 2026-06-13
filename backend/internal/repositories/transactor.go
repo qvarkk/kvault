@@ -22,7 +22,6 @@ func (t *Transactor) WithTx(ctx context.Context, fn func(tx *sqlx.Tx) error) err
 	defer tx.Rollback()
 
 	if err := fn(tx); err != nil {
-		// since fn is passed from a service this doesn't need toRepositoryError wrapping
 		return err
 	}
 

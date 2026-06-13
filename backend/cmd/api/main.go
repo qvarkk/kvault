@@ -94,7 +94,6 @@ func main() {
 		apiKeyRepo   = repositories.NewApiKeyRepo(pg.DB)
 		itemRepo     = repositories.NewItemRepo(pg.DB)
 		fileRepo     = repositories.NewFileRepo(pg.DB)
-		stopwordRepo = repositories.NewStopwordRepo(pg.DB)
 		tagRepo      = repositories.NewTagRepo(pg.DB)
 		transactor   = repositories.NewTransactor(pg.DB)
 	)
@@ -104,8 +103,7 @@ func main() {
 		userService     = services.NewUserService(userRepo, apiKeyRepo, config.Auth.ApiKeyTtl)
 		itemService     = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, enqueuer, cacheConfig.ItemsTtl)
 		fileService     = services.NewFileService(fileRepo, transactor, enqueuer, aws, cacheStore, cacheConfig.FilesTtl)
-		stopwordService = services.NewStopwordService(stopwordRepo, transactor, cacheStore, cacheConfig.StopwordsTtl)
-		tagService      = services.NewTagService(tagRepo, stopwordRepo, itemRepo, transactor, cacheStore, cacheConfig.TagsTtl)
+		tagService      = services.NewTagService(tagRepo, itemRepo, transactor, cacheStore, cacheConfig.TagsTtl)
 	)
 
 	hs := &routes.HandlerServices{
@@ -113,7 +111,6 @@ func main() {
 		AuthUser: userService,
 		Item:     itemService,
 		File:     fileService,
-		Stopword: stopwordService,
 		Tag:      tagService,
 	}
 

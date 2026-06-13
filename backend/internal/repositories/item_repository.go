@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"database/sql"
 	"qvarkk/kvault/internal/domain"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// itemSortColumns whitelists sortable columns → their qualified SQL form.
 var itemSortColumns = map[string]string{
 	"title":      "i.title",
 	"created_at": "i.created_at",
@@ -36,11 +34,6 @@ func NewItemRepo(db *sqlx.DB) *ItemRepo {
 }
 
 func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
-	// url-type items start in "pending" until the worker fetches their content.
-	if item.Type == domain.ItemTypeUrl && !item.UrlStatus.Valid {
-		item.UrlStatus = sql.NullString{String: string(domain.UrlStatusPending), Valid: true}
-	}
-
 	sql, args, err := r.queryBuilder.
 		Insert("items").Columns("user_id", "type", "title", "content", "source_url", "url_status").
 		Values(item.UserID, item.Type, item.Title, item.Content, item.SourceURL, item.UrlStatus).
@@ -70,10 +63,6 @@ func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.
 		if tsQuery != "" {
 			baseQuery = baseQuery.Where("i.search_vector @@ to_tsquery('simple', ?)", tsQuery)
 		}
-	}
-
-	if f.Type != "" {
-		baseQuery = baseQuery.Where(sq.Eq{"i.type": f.Type})
 	}
 
 	var countQuery sq.SelectBuilder
@@ -255,11 +244,6 @@ func (r *ItemRepo) FindIDsByTagID(ctx context.Context, tagID string) ([]string, 
 	return itemIDs, toRepositoryError(err)
 }
 
-func (r *ItemRepo) Autotag(ctx context.Context, itemID, userID string, count int) error {
-	_, err := r.db.ExecContext(ctx, "SELECT extract_item_tags($1, $2, $3)", itemID, userID, count)
-	return toRepositoryError(err)
-}
-
 func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
@@ -305,38 +289,6 @@ func (r *ItemRepo) PermanentlyDeleteAllDeleted(ctx context.Context, userID strin
 	}
 
 	_, err = r.db.ExecContext(ctx, sql, args...)
-	return toRepositoryError(err)
-}
-
-func (r *ItemRepo) UpdateUrlContentTx(ctx context.Context, tx *sqlx.Tx, item *domain.Item) error {
-	query, args, err := r.queryBuilder.
-		Update("items").
-		Set("url_metadata", item.UrlMetadata).
-		Set("extracted_content", item.ExtractedContent).
-		Set("url_status", string(domain.UrlStatusReady)).
-		Set("updated_at", time.Now()).
-		Where(sq.Eq{"id": item.ID}).
-		ToSql()
-	if err != nil {
-		return toRepositoryError(err)
-	}
-
-	_, err = tx.ExecContext(ctx, query, args...)
-	return toRepositoryError(err)
-}
-
-func (r *ItemRepo) SetUrlStatusTx(ctx context.Context, tx *sqlx.Tx, itemID, status string) error {
-	query, args, err := r.queryBuilder.
-		Update("items").
-		Set("url_status", status).
-		Set("updated_at", time.Now()).
-		Where(sq.Eq{"id": itemID}).
-		ToSql()
-	if err != nil {
-		return toRepositoryError(err)
-	}
-
-	_, err = tx.ExecContext(ctx, query, args...)
 	return toRepositoryError(err)
 }
 

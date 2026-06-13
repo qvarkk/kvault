@@ -68,22 +68,6 @@ var serviceErrorRules = []mappingRule{
 		},
 	},
 	{
-		target: services.ErrStopwordNotFound,
-		public: &PublicError{
-			Err:     ErrNotFound,
-			Key:     "err.stopword_not_found",
-			Message: "This stopword does not exist.",
-		},
-	},
-	{
-		target: services.ErrStopwordAlreadyExists,
-		public: &PublicError{
-			Err:     ErrUnprocessableEntity,
-			Key:     "err.stopword_already_exists",
-			Message: "This stopword already exists.",
-		},
-	},
-	{
 		target: services.ErrTagNotFound,
 		public: &PublicError{
 			Err:     ErrNotFound,
@@ -105,22 +89,6 @@ var serviceErrorRules = []mappingRule{
 			Err:     ErrUnprocessableEntity,
 			Key:     "err.pdf_format",
 			Message: "File should be of a PDF content type.",
-		},
-	},
-	{
-		target: services.ErrInsufficientContent,
-		public: &PublicError{
-			Err:     ErrUnprocessableEntity,
-			Key:     "err.insufficient_content",
-			Message: "Not enough content to generate the requested number of tags.",
-		},
-	},
-	{
-		target: services.ErrUrlRequired,
-		public: &PublicError{
-			Err:     ErrUnprocessableEntity,
-			Key:     "err.url_required",
-			Message: "A source URL is required for url-type items.",
 		},
 	},
 }

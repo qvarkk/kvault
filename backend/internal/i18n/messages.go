@@ -66,16 +66,6 @@ var messages = map[string]map[string]string{
 		LocaleRU: "Файл с указанным ID не существует.",
 		LocaleJA: "指定されたIDのファイルは存在しません。",
 	},
-	"err.stopword_not_found": {
-		LocaleEN: "This stopword does not exist.",
-		LocaleRU: "Стоп-слово не найдено.",
-		LocaleJA: "このストップワードは存在しません。",
-	},
-	"err.stopword_already_exists": {
-		LocaleEN: "This stopword already exists.",
-		LocaleRU: "Это стоп-слово уже существует.",
-		LocaleJA: "このストップワードはすでに存在します。",
-	},
 	"err.tag_not_found": {
 		LocaleEN: "This tag does not exist.",
 		LocaleRU: "Тег не найден.",
@@ -90,16 +80,6 @@ var messages = map[string]map[string]string{
 		LocaleEN: "File should be of a PDF content type.",
 		LocaleRU: "Файл должен быть в формате PDF.",
 		LocaleJA: "ファイルはPDF形式でなければなりません。",
-	},
-	"err.insufficient_content": {
-		LocaleEN: "Not enough content to generate the requested number of tags.",
-		LocaleRU: "Недостаточно контента для генерации указанного количества тегов.",
-		LocaleJA: "要求されたタグ数を生成するコンテンツが不足しています。",
-	},
-	"err.url_required": {
-		LocaleEN: "A source URL is required for url-type items.",
-		LocaleRU: "Для элементов типа «url» требуется исходный URL.",
-		LocaleJA: "URLタイプのアイテムにはソースURLが必要です。",
 	},
 	"err.rate_limited": {
 		LocaleEN: "Too many requests. Please slow down and try again later.",

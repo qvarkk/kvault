@@ -58,18 +58,3 @@ func (e *AsynqEnqueuer) EnqueuePdfProcess(ctx context.Context, userID, fileID st
 	_, err = e.client.EnqueueContext(ctx, task, e.opts()...)
 	return err
 }
-
-func (e *AsynqEnqueuer) EnqueueUrlFetch(ctx context.Context, userID, itemID string) error {
-	payload := tasks.UrlFetchPayload{
-		UserID: userID,
-		ItemID: itemID,
-	}
-
-	task, err := tasks.NewUrlFetchTask(payload)
-	if err != nil {
-		return err
-	}
-
-	_, err = e.client.EnqueueContext(ctx, task, e.opts()...)
-	return err
-}
