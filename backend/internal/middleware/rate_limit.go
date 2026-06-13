@@ -72,13 +72,11 @@ func AuthRateLimit() gin.HandlerFunc {
 	return RateLimit(rate.Every(12*time.Second), 5)
 }
 
-// RateLimit returns a gin middleware that throttles per client IP. On rejection
-// it pushes a 429 PublicError through the standard error funnel.
 func RateLimit(r rate.Limit, burst int) gin.HandlerFunc {
 	limiter := newIPRateLimiter(r, burst)
 	return func(ctx *gin.Context) {
 		if !limiter.allow(ctx.ClientIP()) {
-			ctx.Error(&httpx.PublicError{
+			_ = ctx.Error(&httpx.PublicError{
 				Err: httpx.ErrTooManyRequests,
 				Key: "err.rate_limited",
 			})

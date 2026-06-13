@@ -3,6 +3,7 @@ package migrations
 import (
 	"database/sql"
 	"embed"
+	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -37,7 +38,7 @@ func NewMigrator(db *sql.DB, dbName string) (*Migrator, error) {
 
 func (mg *Migrator) Up() error {
 	err := mg.m.Up()
-	if err == migrate.ErrNoChange {
+	if errors.Is(err, migrate.ErrNoChange) {
 		return nil
 	}
 	return err
@@ -55,6 +56,6 @@ func (mg *Migrator) Force(version int) error {
 	return mg.m.Force(version)
 }
 
-func (mg *Migrator) Version() (uint, bool, error) {
+func (mg *Migrator) Version() (version uint, dirty bool, err error) {
 	return mg.m.Version()
 }

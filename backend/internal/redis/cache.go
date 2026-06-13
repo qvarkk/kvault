@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -26,7 +27,7 @@ func NewRedisStore(connConfig ConnConfig, cacheConfig CacheConfig) (*RedisStore,
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, err
 	}
 
@@ -37,7 +38,7 @@ func NewRedisStore(connConfig ConnConfig, cacheConfig CacheConfig) (*RedisStore,
 
 func (s *RedisStore) Get(ctx context.Context, key string) ([]byte, error) {
 	val, err := s.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return nil, nil
 	}
 	if err != nil {

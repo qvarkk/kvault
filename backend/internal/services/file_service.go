@@ -7,8 +7,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
-	"qvarkk/kvault/internal/domain"
 	"time"
+
+	"qvarkk/kvault/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -17,8 +18,8 @@ import (
 
 type FileRepo interface {
 	CreateNew(context.Context, *domain.File) error
-	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
-	ListDeleted(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	List(context.Context, *domain.ListFileFilter) ([]domain.File, int, error)
+	ListDeleted(context.Context, *domain.ListFileFilter) ([]domain.File, int, error)
 	GetAllDeleted(ctx context.Context, userID string) ([]domain.File, error)
 	GetAllByUserID(ctx context.Context, userID string) ([]domain.File, error)
 	GetByID(context.Context, string) (*domain.File, error)
@@ -76,7 +77,11 @@ func (s *FileService) Upload(
 	if err != nil {
 		return nil, err
 	}
-	defer body.Close()
+	defer func() {
+		if err := body.Close(); err != nil {
+			zap.L().Error("failed to close PDF file body", zap.Error(err))
+		}
+	}()
 
 	s3Key := uuid.New().String() + ".pdf"
 	err = s.storage.Upload(ctx, s3Key, body)
@@ -93,7 +98,7 @@ func (s *FileService) Upload(
 		Status:       string(domain.FileStatusUploading),
 	}
 
-	file, err := s.createNew(ctx, fileInput)
+	file, err := s.createNew(ctx, &fileInput)
 	if err != nil {
 		_ = s.storage.Delete(ctx, s3Key)
 		return nil, err
@@ -101,8 +106,6 @@ func (s *FileService) Upload(
 
 	err = s.tasker.EnqueuePdfProcess(ctx, userID, file.ID)
 	if err != nil {
-		// Compensate so the failed upload leaves no orphan: remove both the S3
-		// object and the just-created DB row.
 		if delErr := s.storage.Delete(ctx, s3Key); delErr != nil {
 			zap.L().Warn("failed to delete s3 object after enqueue failure",
 				zap.String("s3_key", s3Key), zap.Error(delErr))
@@ -133,24 +136,30 @@ func (s *FileService) validatePdfAndOpenFile(fileHeader *multipart.FileHeader) (
 	buffer := make([]byte, 512)
 	n, err := file.Read(buffer)
 	if err != nil {
-		file.Close()
+		if err := file.Close(); err != nil {
+			return nil, NewServiceError(ErrInternal, "failed to close file", err)
+		}
 		return nil, NewServiceError(ErrInternal, "failed to read uploaded file", err)
 	}
 
 	contentType := http.DetectContentType(buffer[:n])
 	if contentType != "application/pdf" {
-		file.Close()
+		if err := file.Close(); err != nil {
+			return nil, NewServiceError(ErrInternal, "failed to close file", err)
+		}
 		return nil, NewServiceError(ErrPdfFileFormat, "invalid file content type", nil)
 	}
 
 	if seeker, ok := file.(io.Seeker); ok {
-		seeker.Seek(0, io.SeekStart)
+		if _, err = seeker.Seek(0, io.SeekStart); err != nil {
+			return nil, NewServiceError(ErrInternal, "failed to reset file pointer", err)
+		}
 	}
 
 	return file, nil
 }
 
-func (s *FileService) createNew(ctx context.Context, input CreateFileInput) (*domain.File, error) {
+func (s *FileService) createNew(ctx context.Context, input *CreateFileInput) (*domain.File, error) {
 	file := &domain.File{
 		UserID:       input.UserID,
 		OriginalName: input.OriginalName,
@@ -168,7 +177,7 @@ func (s *FileService) createNew(ctx context.Context, input CreateFileInput) (*do
 	return file, nil
 }
 
-func (s *FileService) List(ctx context.Context, f domain.ListFileFilter) ([]domain.File, int, error) {
+func (s *FileService) List(ctx context.Context, f *domain.ListFileFilter) ([]domain.File, int, error) {
 	version := listVersion(ctx, s.cache, fileListVersionKey(f.UserID))
 	cacheKey := fileListKey(version, f)
 
@@ -292,7 +301,7 @@ func (s *FileService) GetFilePresignedViewUrl(ctx context.Context, fileID, userI
 	}, nil
 }
 
-func (s *FileService) ListDeleted(ctx context.Context, f domain.ListFileFilter) ([]domain.File, int, error) {
+func (s *FileService) ListDeleted(ctx context.Context, f *domain.ListFileFilter) ([]domain.File, int, error) {
 	files, count, err := s.fileRepo.ListDeleted(ctx, f)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list deleted files error", err)
@@ -306,11 +315,11 @@ func (s *FileService) ClearTrash(ctx context.Context, userID string) error {
 		return NewServiceError(ErrInternal, "get deleted files error", err)
 	}
 
-	for _, f := range files {
-		if err := s.storage.Delete(ctx, f.S3Key); err != nil {
+	for i := range files {
+		if err := s.storage.Delete(ctx, files[i].S3Key); err != nil {
 			// best effort — log but continue so DB records are cleaned up
 			zap.L().Warn("failed to delete s3 object while clearing trash",
-				zap.String("s3_key", f.S3Key), zap.String("file_id", f.ID), zap.Error(err))
+				zap.String("s3_key", files[i].S3Key), zap.String("file_id", files[i].ID), zap.Error(err))
 		}
 	}
 
@@ -349,10 +358,10 @@ func (s *FileService) DeleteAllByUserID(ctx context.Context, userID string) erro
 		return NewServiceError(ErrInternal, "get user files error", err)
 	}
 
-	for _, f := range files {
-		if err := s.storage.Delete(ctx, f.S3Key); err != nil {
+	for i := range files {
+		if err := s.storage.Delete(ctx, files[i].S3Key); err != nil {
 			zap.L().Warn("failed to delete s3 object while deleting user files",
-				zap.String("s3_key", f.S3Key), zap.String("file_id", f.ID), zap.Error(err))
+				zap.String("s3_key", files[i].S3Key), zap.String("file_id", files[i].ID), zap.Error(err))
 		}
 	}
 
@@ -363,7 +372,7 @@ func fileListVersionKey(userID string) string {
 	return fmt.Sprintf("files:version:user:%s", userID)
 }
 
-func fileListKey(version int64, f domain.ListFileFilter) string {
+func fileListKey(version int64, f *domain.ListFileFilter) string {
 	return fmt.Sprintf(
 		"files:list:v%d:user:%s:mime:%s:page:%d:size:%d:dir:%s:col:%s:q:%s",
 		version, f.UserID, f.MimeType, f.Page, f.PageSize, f.Direction, f.Column, f.Query,

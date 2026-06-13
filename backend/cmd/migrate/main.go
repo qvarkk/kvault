@@ -4,28 +4,29 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
+
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/logger"
 	"qvarkk/kvault/migrations"
-	"strconv"
-	"time"
 
 	"go.uber.org/zap"
 )
 
 func main() {
-	config, err := config.LoadConfig()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	err = logger.Init("migrate", config.Debug)
+	err = logger.Init("migrate", cfg.Debug)
 	if err != nil {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", config.DB.Username, config.DB.Password, config.DB.Host, config.DB.Port, config.DB.Database)
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.DB.Username, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Database)
 	pgConfig := postgres.Config{
 		DSN:             dsn,
 		MaxOpenConns:    10,
@@ -37,9 +38,13 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("Connection to database failed", zap.Error(err))
 	}
-	defer pg.Close()
+	defer func() {
+		if err := pg.Close(); err != nil {
+			zap.L().Error("failed to close database connection", zap.Error(err))
+		}
+	}()
 
-	migrator, err := migrations.NewMigrator(pg.DB.DB, config.DB.Database)
+	migrator, err := migrations.NewMigrator(pg.DB.DB, cfg.DB.Database)
 	if err != nil {
 		zap.L().Fatal("Failed to initialize migration module", zap.Error(err))
 	}

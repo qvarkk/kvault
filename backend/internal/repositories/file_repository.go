@@ -2,9 +2,10 @@ package repositories
 
 import (
 	"context"
-	"qvarkk/kvault/internal/domain"
 	"strings"
 	"unicode"
+
+	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -46,37 +47,42 @@ func (r *FileRepo) CreateNew(ctx context.Context, file *domain.File) error {
 	return toRepositoryError(err)
 }
 
-func (r *FileRepo) List(ctx context.Context, params domain.ListFileFilter) ([]domain.File, int, error) {
+func (r *FileRepo) List(ctx context.Context, f *domain.ListFileFilter) ([]domain.File, int, error) {
 	var files []domain.File
 	var count int
 
-	offset := uint64(params.PageSize * (params.Page - 1))
+	page := max(f.Page, 1)
+	pageSize := max(f.PageSize, 0)
+
+	//nolint:gosec // G115: page>=1 and pageSize>=0 via max() above
+	offset := uint64(pageSize * (page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
 		From("files").
-		Where(sq.Eq{"user_id": params.UserID}).
+		Where(sq.Eq{"user_id": f.UserID}).
 		Where(sq.Eq{"deleted_at": nil})
 
 	var tsQuery string
-	if params.Query != "" {
-		tsQuery = buildFileTsQuery(params.Query)
+	if f.Query != "" {
+		tsQuery = buildFileTsQuery(f.Query)
 		if tsQuery != "" {
 			baseQuery = baseQuery.Where("search_vector @@ to_tsquery('simple', ?)", tsQuery)
 		}
 	}
 
-	if params.MimeType != "" {
-		baseQuery = baseQuery.Where(sq.Eq{"mime_type": params.MimeType})
+	if f.MimeType != "" {
+		baseQuery = baseQuery.Where(sq.Eq{"mime_type": f.MimeType})
 	}
 
 	filesQuery := baseQuery.Columns("*")
 	if tsQuery != "" {
 		filesQuery = filesQuery.OrderByClause(sq.Expr("ts_rank(search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
 	}
+	//nolint:gosec // G115: pageSize>=0 via max() above
 	filesQuery = filesQuery.
-		OrderBy(safeOrderBy(params.Column, params.Direction, fileSortColumns, fileSortDefault)).
+		OrderBy(safeOrderBy(f.Column, f.Direction, fileSortColumns, fileSortDefault)).
 		Offset(offset).
-		Limit(uint64(params.PageSize))
+		Limit(uint64(pageSize))
 	countQuery := baseQuery.Columns("COUNT(*)")
 
 	filesQuerySql, filesArgs, err := filesQuery.ToSql()
@@ -196,22 +202,27 @@ func (r *FileRepo) RestoreByIDTx(ctx context.Context, tx *sqlx.Tx, fileID string
 	return toRepositoryError(err)
 }
 
-func (r *FileRepo) ListDeleted(ctx context.Context, params domain.ListFileFilter) ([]domain.File, int, error) {
+func (r *FileRepo) ListDeleted(ctx context.Context, f *domain.ListFileFilter) ([]domain.File, int, error) {
 	var files []domain.File
 	var count int
 
-	offset := uint64(params.PageSize * (params.Page - 1))
+	page := max(f.Page, 1)
+	pageSize := max(f.PageSize, 0)
+
+	//nolint:gosec // G115: page>=1 and pageSize>=0 via max() above
+	offset := uint64(pageSize * (page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
 		From("files").
-		Where(sq.Eq{"user_id": params.UserID}).
+		Where(sq.Eq{"user_id": f.UserID}).
 		Where(sq.NotEq{"deleted_at": nil})
 
 	countQuery := baseQuery.Columns("COUNT(*)")
+	//nolint:gosec // G115: pageSize>=0 via max() above
 	filesQuery := baseQuery.Columns("*").
-		OrderBy(safeOrderBy(params.Column, params.Direction, fileSortColumns, fileSortDefault)).
+		OrderBy(safeOrderBy(f.Column, f.Direction, fileSortColumns, fileSortDefault)).
 		Offset(offset).
-		Limit(uint64(params.PageSize))
+		Limit(uint64(pageSize))
 
 	filesQuerySql, filesArgs, err := filesQuery.ToSql()
 	if err != nil {

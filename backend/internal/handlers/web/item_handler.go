@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
 
@@ -11,8 +12,8 @@ import (
 
 type ItemService interface {
 	CreateNew(context.Context, services.CreateItemInput) (*domain.Item, error)
-	List(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
-	ListDeleted(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
+	List(context.Context, *domain.ListItemFilter) ([]domain.Item, int, error)
+	ListDeleted(context.Context, *domain.ListItemFilter) ([]domain.Item, int, error)
 	GetByID(ctx context.Context, itemID, userID string) (*domain.Item, error)
 	DeleteByID(ctx context.Context, itemID, userID string) error
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
@@ -57,10 +58,6 @@ type updateItemRequest struct {
 
 type bindTagRequest struct {
 	TagID string `json:"tag_id" binding:"required,uuid"`
-}
-
-type autotagRequest struct {
-	Number int `json:"number" binding:"required,min=1,max=10"`
 }
 
 type unbindTagUri struct {
@@ -140,14 +137,14 @@ func (h *ItemHandler) List(ctx *gin.Context) error {
 		},
 	}
 
-	items, total, err := h.itemService.List(ctx, params)
+	items, total, err := h.itemService.List(ctx, &params)
 	if err != nil {
 		return err
 	}
 
 	itemResponses := make([]ItemResponse, len(items))
-	for i, item := range items {
-		itemResponses[i] = toItemResponse(&item)
+	for i := range items {
+		itemResponses[i] = toItemResponse(&items[i])
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(itemResponses, total, params.Page, params.PageSize))
@@ -379,14 +376,14 @@ func (h *ItemHandler) ListDeleted(ctx *gin.Context) error {
 		},
 	}
 
-	items, total, err := h.itemService.ListDeleted(ctx, params)
+	items, total, err := h.itemService.ListDeleted(ctx, &params)
 	if err != nil {
 		return err
 	}
 
 	itemResponses := make([]ItemResponse, len(items))
-	for i, item := range items {
-		itemResponses[i] = toItemResponse(&item)
+	for i := range items {
+		itemResponses[i] = toItemResponse(&items[i])
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(itemResponses, total, params.Page, params.PageSize))

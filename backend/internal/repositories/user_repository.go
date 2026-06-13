@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+
 	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
@@ -71,7 +72,7 @@ func (r *UserRepo) DeleteByID(ctx context.Context, userID string) error {
 	return toRepositoryError(err)
 }
 
-func (r *UserRepo) getByField(ctx context.Context, field string, value string) (*domain.User, error) {
+func (r *UserRepo) getByField(ctx context.Context, field, value string) (*domain.User, error) {
 	sql, args, err := r.queryBuilder.
 		Select("*").From("users").
 		Where(sq.Eq{field: value}).ToSql()

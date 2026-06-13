@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/repositories"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -14,7 +15,7 @@ import (
 
 type TagRepo interface {
 	CreateNew(context.Context, *domain.Tag) error
-	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
+	List(context.Context, *domain.ListTagFilter) ([]domain.Tag, int, error)
 	GetByID(context.Context, string) (*domain.Tag, error)
 	GetByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Tag, error)
 	UpdateTx(context.Context, *sqlx.Tx, *domain.Tag) error
@@ -82,7 +83,7 @@ func (s *TagService) CreateNew(
 
 func (s *TagService) List(
 	ctx context.Context,
-	f domain.ListTagFilter,
+	f *domain.ListTagFilter,
 ) ([]domain.Tag, int, error) {
 	version := listVersion(ctx, s.cache, tagListVersionKey(f.UserID))
 	cacheKey := tagListKey(version, f)
@@ -180,7 +181,7 @@ func tagListVersionKey(userID string) string {
 	return fmt.Sprintf("tags:version:user:%s", userID)
 }
 
-func tagListKey(version int64, f domain.ListTagFilter) string {
+func tagListKey(version int64, f *domain.ListTagFilter) string {
 	return fmt.Sprintf(
 		"tags:list:v%d:user:%s:page:%d:size:%d:dir:%s:col:%s:q:%s",
 		version, f.UserID, f.Page, f.PageSize, f.Direction, f.Column, f.Query,

@@ -12,7 +12,7 @@ type PaginatedResponse[T any] struct {
 	PageSize int `json:"page_size"`
 }
 
-func toPaginatedResponse[T any](data []T, total int, page int, page_size int) PaginatedResponse[T] {
+func toPaginatedResponse[T any](data []T, total, page, page_size int) PaginatedResponse[T] {
 	return PaginatedResponse[T]{
 		Data:     data,
 		Total:    total,

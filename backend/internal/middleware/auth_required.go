@@ -2,8 +2,9 @@ package middleware
 
 import (
 	"context"
-	"qvarkk/kvault/internal/domain"
 	"strings"
+
+	"qvarkk/kvault/internal/domain"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +23,7 @@ func AuthRequired(userService UserService) gin.HandlerFunc {
 
 		user, apiKeyID, err := userService.Authenticate(ctx.Request.Context(), apiKey)
 		if err != nil {
-			ctx.Error(err)
+			_ = ctx.Error(err)
 			ctx.Abort()
 			return
 		}

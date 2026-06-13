@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
 
@@ -11,7 +12,7 @@ import (
 
 type TagService interface {
 	CreateNew(context.Context, services.CreateTagInput) (*domain.Tag, error)
-	List(context.Context, domain.ListTagFilter) ([]domain.Tag, int, error)
+	List(context.Context, *domain.ListTagFilter) ([]domain.Tag, int, error)
 	Update(context.Context, services.UpdateTagInput) (*domain.Tag, error)
 	DeleteByID(ctx context.Context, tagID, userID string, block bool) error
 }
@@ -115,7 +116,7 @@ func (h *TagHandler) List(ctx *gin.Context) error {
 		},
 	}
 
-	tags, count, err := h.tagService.List(ctx, params)
+	tags, count, err := h.tagService.List(ctx, &params)
 	if err != nil {
 		return err
 	}

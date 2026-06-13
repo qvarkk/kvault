@@ -5,11 +5,13 @@ import (
 	"context"
 	"io"
 	"os"
-	"qvarkk/kvault/internal/domain"
 	"strings"
+
+	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ledongthuc/pdf"
+	"go.uber.org/zap"
 )
 
 type UpdateFileInput struct {
@@ -43,14 +45,32 @@ func (s *FileTaskService) ExtractTextFromFile(ctx context.Context, file *domain.
 	if err != nil {
 		return "", err
 	}
-	defer body.Close()
+	defer func() {
+		_ = body.Close()
+	}()
 
 	tmpFile, err := os.CreateTemp("", "*.pdf")
 	if err != nil {
 		return "", err
 	}
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		err := tmpFile.Close()
+		if err != nil {
+			zap.L().Warn("failed to close temporary file",
+				zap.String("filename", tmpFile.Name()),
+				zap.Error(err),
+			)
+		}
+	}()
+	defer func() {
+		err := os.Remove(tmpFile.Name())
+		if err != nil {
+			zap.L().Warn("failed to remove temporary file",
+				zap.String("filename", tmpFile.Name()),
+				zap.Error(err),
+			)
+		}
+	}()
 
 	_, err = io.Copy(tmpFile, body)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"mime/multipart"
 	"net/http"
+
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/gin-gonic/gin"
@@ -11,8 +12,8 @@ import (
 
 type FileService interface {
 	Upload(context.Context, string, *multipart.FileHeader) (*domain.File, error)
-	List(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
-	ListDeleted(context.Context, domain.ListFileFilter) ([]domain.File, int, error)
+	List(context.Context, *domain.ListFileFilter) ([]domain.File, int, error)
+	ListDeleted(context.Context, *domain.ListFileFilter) ([]domain.File, int, error)
 	GetByID(ctx context.Context, fileID, userID string) (*domain.File, error)
 	GetFilePresignedUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
 	GetFilePresignedViewUrl(ctx context.Context, fileID, userID string) (*domain.PresignedURL, error)
@@ -114,14 +115,14 @@ func (h *FileHandler) List(ctx *gin.Context) error {
 		},
 	}
 
-	files, total, err := h.fileService.List(ctx, params)
+	files, total, err := h.fileService.List(ctx, &params)
 	if err != nil {
 		return err
 	}
 
 	fileResponses := make([]FileResponse, len(files))
-	for i, file := range files {
-		fileResponses[i] = toFileResponse(&file)
+	for i := range files {
+		fileResponses[i] = toFileResponse(&files[i])
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(fileResponses, total, params.Page, params.PageSize))
@@ -299,14 +300,14 @@ func (h *FileHandler) ListDeleted(ctx *gin.Context) error {
 		},
 	}
 
-	files, total, err := h.fileService.ListDeleted(ctx, params)
+	files, total, err := h.fileService.ListDeleted(ctx, &params)
 	if err != nil {
 		return err
 	}
 
 	fileResponses := make([]FileResponse, len(files))
-	for i, file := range files {
-		fileResponses[i] = toFileResponse(&file)
+	for i := range files {
+		fileResponses[i] = toFileResponse(&files[i])
 	}
 
 	ctx.JSON(http.StatusOK, toPaginatedResponse(fileResponses, total, params.Page, params.PageSize))

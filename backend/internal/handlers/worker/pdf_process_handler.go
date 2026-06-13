@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+
 	"qvarkk/kvault/internal/domain"
 	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/internal/tasks"
@@ -82,7 +83,7 @@ func (h *FileTaskHandler) HandlePdfProcessTask(ctx context.Context, t *asynq.Tas
 
 	input = baseInput
 	input.TextContent = Ptr(text)
-	file, err = h.fileService.UpdateFile(ctx, input)
+	_, err = h.fileService.UpdateFile(ctx, input)
 	if err != nil {
 		return err
 	}

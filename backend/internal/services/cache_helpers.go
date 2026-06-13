@@ -27,6 +27,13 @@ func listVersion(ctx context.Context, cache CacheStore, versionKey string) int64
 		return 0
 	}
 	version, err := strconv.ParseInt(string(val), 10, 64)
+	if err != nil {
+		zap.L().Warn("failed to parse version to int",
+			zap.ByteString("version", val),
+			zap.Error(err),
+		)
+		return 0
+	}
 	return version
 }
 

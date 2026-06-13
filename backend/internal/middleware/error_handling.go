@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+
 	"qvarkk/kvault/internal/httpx"
 	"qvarkk/kvault/internal/i18n"
 	"qvarkk/kvault/internal/services"
@@ -15,7 +16,7 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
-		if len(c.Errors) <= 0 {
+		if len(c.Errors) == 0 {
 			return
 		}
 

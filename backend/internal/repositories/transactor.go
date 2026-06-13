@@ -19,7 +19,8 @@ func (t *Transactor) WithTx(ctx context.Context, fn func(tx *sqlx.Tx) error) err
 	if err != nil {
 		return toRepositoryError(err)
 	}
-	defer tx.Rollback()
+	// TODO: look into that
+	defer func() { _ = tx.Rollback() }()
 
 	if err := fn(tx); err != nil {
 		return err

@@ -1,8 +1,9 @@
 package web
 
 import (
-	"qvarkk/kvault/internal/domain"
 	"time"
+
+	"qvarkk/kvault/internal/domain"
 )
 
 type ApiKeyResponse struct {
@@ -14,7 +15,7 @@ type ApiKeyResponse struct {
 	ExpiresAt  string `json:"expires_at"`
 }
 
-func toApiKeyResponse(key domain.ApiKey, currentKeyID string) ApiKeyResponse {
+func toApiKeyResponse(key *domain.ApiKey, currentKeyID string) ApiKeyResponse {
 	return ApiKeyResponse{
 		ID:         key.ID,
 		Label:      key.Label,
@@ -27,8 +28,8 @@ func toApiKeyResponse(key domain.ApiKey, currentKeyID string) ApiKeyResponse {
 
 func toApiKeyResponses(keys []domain.ApiKey, currentKeyID string) []ApiKeyResponse {
 	resp := make([]ApiKeyResponse, 0, len(keys))
-	for _, k := range keys {
-		resp = append(resp, toApiKeyResponse(k, currentKeyID))
+	for i := range keys {
+		resp = append(resp, toApiKeyResponse(&keys[i], currentKeyID))
 	}
 	return resp
 }

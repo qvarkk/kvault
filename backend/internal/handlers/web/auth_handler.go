@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+
 	"qvarkk/kvault/internal/domain"
 
 	"github.com/gin-gonic/gin"

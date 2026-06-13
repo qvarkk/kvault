@@ -62,7 +62,10 @@ func TestValidatePdfAndOpenFile(t *testing.T) {
 			continue
 		}
 		got, readErr := io.ReadAll(rc)
-		rc.Close()
+		err = rc.Close()
+		if err != nil {
+			t.Errorf("failed to close io.ReadCloser: %v", err)
+		}
 		if readErr != nil {
 			t.Errorf("%s: read returned reader: %v", c.name, readErr)
 		}

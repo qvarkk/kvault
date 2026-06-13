@@ -2,10 +2,11 @@ package repositories
 
 import (
 	"context"
-	"qvarkk/kvault/internal/domain"
 	"strings"
 	"time"
 	"unicode"
+
+	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -46,11 +47,15 @@ func (r *ItemRepo) CreateNew(ctx context.Context, item *domain.Item) error {
 	return toRepositoryError(err)
 }
 
-func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+func (r *ItemRepo) List(ctx context.Context, f *domain.ListItemFilter) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
-	offset := uint64(f.PageSize * (f.Page - 1))
+	page := max(f.Page, 1)
+	pageSize := max(f.PageSize, 0)
+
+	//nolint:gosec // G115: page>=1 and pageSize>=0 via max() above
+	offset := uint64(pageSize * (page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
 		From("items i").
@@ -80,10 +85,11 @@ func (r *ItemRepo) List(ctx context.Context, f domain.ListItemFilter) ([]domain.
 	if tsQuery != "" {
 		itemsQuery = itemsQuery.OrderByClause(sq.Expr("ts_rank(i.search_vector, to_tsquery('simple', ?)) DESC", tsQuery))
 	}
+	//nolint:gosec // G115: pageSize>=0 via max() above
 	itemsQuery = itemsQuery.
 		OrderBy(safeOrderBy(f.Column, f.Direction, itemSortColumns, itemSortDefault)).
 		Offset(offset).
-		Limit(uint64(f.PageSize))
+		Limit(uint64(pageSize))
 
 	itemsQuerySql, itemsArgs, err := itemsQuery.ToSql()
 	if err != nil {
@@ -244,11 +250,15 @@ func (r *ItemRepo) FindIDsByTagID(ctx context.Context, tagID string) ([]string, 
 	return itemIDs, toRepositoryError(err)
 }
 
-func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+func (r *ItemRepo) ListDeleted(ctx context.Context, f *domain.ListItemFilter) ([]domain.Item, int, error) {
 	var items []domain.Item
 	var count int
 
-	offset := uint64(f.PageSize * (f.Page - 1))
+	page := max(f.Page, 1)
+	pageSize := max(f.PageSize, 0)
+
+	//nolint:gosec // G115: page>=1 and pageSize>=0 via max() above
+	offset := uint64(pageSize * (page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
 		From("items i").
@@ -256,10 +266,11 @@ func (r *ItemRepo) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]
 		Where(sq.NotEq{"i.deleted_at": nil})
 
 	countQuery := baseQuery.Columns("COUNT(*)")
+	//nolint:gosec // G115: pageSize>=0 via max() above
 	itemsQuery := baseQuery.Columns("i.*").
 		OrderBy(safeOrderBy(f.Column, f.Direction, itemSortColumns, itemSortDefault)).
 		Offset(offset).
-		Limit(uint64(f.PageSize))
+		Limit(uint64(pageSize))
 
 	itemsQuerySql, itemsArgs, err := itemsQuery.ToSql()
 	if err != nil {

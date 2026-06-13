@@ -2,8 +2,9 @@ package repositories
 
 import (
 	"context"
-	"qvarkk/kvault/internal/domain"
 	"time"
+
+	"qvarkk/kvault/internal/domain"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -50,26 +51,31 @@ func (r *TagRepo) CreateNew(ctx context.Context, tag *domain.Tag) error {
 
 func (r *TagRepo) List(
 	ctx context.Context,
-	params domain.ListTagFilter,
+	f *domain.ListTagFilter,
 ) ([]domain.Tag, int, error) {
-	offset := uint64(params.PageSize * (params.Page - 1))
+	page := max(f.Page, 1)
+	pageSize := max(f.PageSize, 0)
+
+	//nolint:gosec // G115: page>=1 and pageSize>=0 via max() above
+	offset := uint64(pageSize * (page - 1))
 	baseQuery := r.queryBuilder.
 		Select().
 		From("tags t").
 		LeftJoin("item_tags it ON it.tag_id = t.id").
 		LeftJoin("items i ON i.id = it.item_id AND i.deleted_at IS NULL").
-		Where(sq.Eq{"t.user_id": params.UserID})
+		Where(sq.Eq{"t.user_id": f.UserID})
 
-	if params.Query != "" {
-		baseQuery = baseQuery.Where(`t.name ILIKE ? ESCAPE '\'`, "%"+escapeLike(params.Query)+"%")
+	if f.Query != "" {
+		baseQuery = baseQuery.Where(`t.name ILIKE ? ESCAPE '\'`, "%"+escapeLike(f.Query)+"%")
 	}
 
+	//nolint:gosec // G115: pageSize>=0 via max() above
 	tagsSql, tagsArgs, err := baseQuery.
 		Columns("t.*", "COUNT(it.item_id) AS item_count").
 		GroupBy("t.id").
-		OrderBy(safeOrderBy(params.Column, params.Direction, tagSortColumns, tagSortDefault)).
+		OrderBy(safeOrderBy(f.Column, f.Direction, tagSortColumns, tagSortDefault)).
 		Offset(offset).
-		Limit(uint64(params.PageSize)).
+		Limit(uint64(page)).
 		ToSql()
 	if err != nil {
 		return nil, 0, toRepositoryError(err)
@@ -190,7 +196,7 @@ func (r *TagRepo) FindByItemIDs(
 	if err != nil {
 		return nil, toRepositoryError(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(ItemTagsByID)
 	for rows.Next() {

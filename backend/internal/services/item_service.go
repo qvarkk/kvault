@@ -3,16 +3,17 @@ package services
 import (
 	"context"
 	"fmt"
-	"qvarkk/kvault/internal/domain"
 	"strings"
 	"time"
+
+	"qvarkk/kvault/internal/domain"
 
 	"github.com/jmoiron/sqlx"
 )
 
 type ItemRepo interface {
 	CreateNew(context.Context, *domain.Item) error
-	List(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
+	List(context.Context, *domain.ListItemFilter) ([]domain.Item, int, error)
 	GetByID(context.Context, string) (*domain.Item, error)
 	GetActiveByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
 	GetDeletedByIDForUpdate(context.Context, *sqlx.Tx, string) (*domain.Item, error)
@@ -22,7 +23,7 @@ type ItemRepo interface {
 	BindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 	UnbindTagByItemIDTx(ctx context.Context, tx *sqlx.Tx, itemID, tagID string) error
 	FindIDsByTagID(context.Context, string) ([]string, error)
-	ListDeleted(context.Context, domain.ListItemFilter) ([]domain.Item, int, error)
+	ListDeleted(context.Context, *domain.ListItemFilter) ([]domain.Item, int, error)
 	PermanentlyDeleteAllDeleted(ctx context.Context, userID string) error
 	PermanentlyDeleteByIDTx(context.Context, *sqlx.Tx, string) error
 }
@@ -87,7 +88,7 @@ func (s *ItemService) CreateNew(ctx context.Context, input CreateItemInput) (*do
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+func (s *ItemService) List(ctx context.Context, f *domain.ListItemFilter) ([]domain.Item, int, error) {
 	version := listVersion(ctx, s.cache, itemListVersionKey(f.UserID))
 	cacheKey := itemListKey(version, f)
 
@@ -102,8 +103,8 @@ func (s *ItemService) List(ctx context.Context, f domain.ListItemFilter) ([]doma
 
 	if len(items) > 0 {
 		ids := make([]string, len(items))
-		for i, item := range items {
-			ids[i] = item.ID
+		for i := range items {
+			ids[i] = items[i].ID
 		}
 
 		tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
@@ -297,7 +298,7 @@ func (s *ItemService) authorizeAndBindTagTx(
 	return nil
 }
 
-func (s *ItemService) ListDeleted(ctx context.Context, f domain.ListItemFilter) ([]domain.Item, int, error) {
+func (s *ItemService) ListDeleted(ctx context.Context, f *domain.ListItemFilter) ([]domain.Item, int, error) {
 	items, count, err := s.itemRepo.ListDeleted(ctx, f)
 	if err != nil {
 		return nil, 0, NewServiceError(ErrInternal, "list deleted items error", err)
@@ -305,8 +306,8 @@ func (s *ItemService) ListDeleted(ctx context.Context, f domain.ListItemFilter) 
 
 	if len(items) > 0 {
 		ids := make([]string, len(items))
-		for i, item := range items {
-			ids[i] = item.ID
+		for i := range items {
+			ids[i] = items[i].ID
 		}
 		tagsByItem, err := s.tagRepo.FindByItemIDs(ctx, ids)
 		if err != nil {
@@ -344,7 +345,7 @@ func itemListVersionKey(userID string) string {
 	return fmt.Sprintf("items:version:user:%s", userID)
 }
 
-func itemListKey(version int64, f domain.ListItemFilter) string {
+func itemListKey(version int64, f *domain.ListItemFilter) string {
 	return fmt.Sprintf(
 		"items:list:v%d:user:%s:page:%d:size:%d:dir:%s:col:%s:q:%s:tags:%s",
 		version, f.UserID, f.Page, f.PageSize, f.Direction, f.Column, f.Query,

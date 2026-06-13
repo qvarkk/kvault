@@ -1,8 +1,9 @@
 package web
 
 import (
-	"qvarkk/kvault/internal/domain"
 	"time"
+
+	"qvarkk/kvault/internal/domain"
 )
 
 type UserResponse struct {

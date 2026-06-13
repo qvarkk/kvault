@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
+
 	"qvarkk/kvault/config"
 	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/handlers/worker"
@@ -12,24 +14,23 @@ import (
 	"qvarkk/kvault/internal/services"
 	"qvarkk/kvault/internal/tasks"
 	"qvarkk/kvault/logger"
-	"time"
 
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 )
 
 func main() {
-	config, err := config.LoadConfig()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	err = logger.Init("worker", config.Debug)
+	err = logger.Init("worker", cfg.Debug)
 	if err != nil {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", config.DB.Username, config.DB.Password, config.DB.Host, config.DB.Port, config.DB.Database)
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.DB.Username, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Database)
 	pgConfig := postgres.Config{
 		DSN:             dsn,
 		MaxOpenConns:    10,
@@ -41,22 +42,26 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("Connection to database failed", zap.Error(err))
 	}
-	defer pg.Close()
+	defer func() {
+		if err := pg.Close(); err != nil {
+			zap.L().Error("failed to close database connection", zap.Error(err))
+		}
+	}()
 
-	aws, err := aws.NewAwsStorage(config.Aws, nil)
+	storage, err := aws.NewAwsStorage(&cfg.Aws, nil)
 	if err != nil {
 		zap.L().Fatal("Connection to AWS failed", zap.Error(err))
 	}
 
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{
-			Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
-			Username: config.Redis.User,
-			Password: config.Redis.Password,
-			DB:       config.Redis.QueueDb,
+			Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
+			Username: cfg.Redis.User,
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.QueueDb,
 		},
 		asynq.Config{
-			Concurrency: config.Worker.ConcurrentTasks,
+			Concurrency: cfg.Worker.ConcurrentTasks,
 			ErrorHandler: asynq.ErrorHandlerFunc(func(_ context.Context, task *asynq.Task, err error) {
 				zap.L().Error("asynq task failed",
 					zap.String("type", task.Type()),
@@ -69,13 +74,15 @@ func main() {
 
 	fileRepo := repositories.NewFileRepo(pg.DB)
 	transactor := repositories.NewTransactor(pg.DB)
-	fileService := services.NewFileTaskService(fileRepo, transactor, aws)
+	fileService := services.NewFileTaskService(fileRepo, transactor, storage)
 	fileTaskHandler := worker.NewFileTaskHandler(fileService)
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(tasks.TypePdfProcess, fileTaskHandler.HandlePdfProcessTask)
 
 	if err := srv.Run(mux); err != nil {
-		log.Fatal(err)
+		zap.L().Error("asynq worker failed",
+			zap.Error(err),
+		)
 	}
 }

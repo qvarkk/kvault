@@ -1,14 +1,16 @@
 package logger
 
 import (
+	"log"
 	"os"
+	"path/filepath"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func Init(filename string, debug bool) error {
-	logFile, err := os.OpenFile(filename+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(filepath.Clean(filename)+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -37,5 +39,8 @@ func Init(filename string, debug bool) error {
 }
 
 func Sync() {
-	zap.L().Sync()
+	err := zap.L().Sync()
+	if err != nil {
+		log.Fatal("Failed to sync logger data")
+	}
 }

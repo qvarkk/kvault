@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"qvarkk/kvault/config"
 	"time"
+
+	"qvarkk/kvault/config"
 
 	awslib "github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -28,7 +29,7 @@ type AwsStorage struct {
 	viewUrlExpiration time.Duration
 }
 
-func NewAwsStorage(config config.AwsConfig, corsOrigins []string) (*AwsStorage, error) {
+func NewAwsStorage(cfg *config.AwsConfig, corsOrigins []string) (*AwsStorage, error) {
 	awsConfig, err := awscfg.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, err
@@ -39,20 +40,20 @@ func NewAwsStorage(config config.AwsConfig, corsOrigins []string) (*AwsStorage, 
 	})
 
 	presignBase := client
-	if config.PublicEndpointUrl != "" {
+	if cfg.PublicEndpointUrl != "" {
 		presignBase = s3.NewFromConfig(awsConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
-			o.BaseEndpoint = awslib.String(config.PublicEndpointUrl)
+			o.BaseEndpoint = awslib.String(cfg.PublicEndpointUrl)
 		})
 	}
 
 	storage := &AwsStorage{
 		s3Client:          client,
 		presignClient:     s3.NewPresignClient(presignBase),
-		bucketName:        config.S3Bucket,
+		bucketName:        cfg.S3Bucket,
 		prefix:            uploadsPrefix,
-		urlExpiration:     config.UrlExpiration,
-		viewUrlExpiration: config.ViewUrlExpiration,
+		urlExpiration:     cfg.UrlExpiration,
+		viewUrlExpiration: cfg.ViewUrlExpiration,
 	}
 
 	if len(corsOrigins) > 0 {

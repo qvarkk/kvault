@@ -4,7 +4,7 @@ import (
 	"qvarkk/kvault/internal/handlers/web"
 	"qvarkk/kvault/internal/middleware"
 
-	_ "qvarkk/kvault/docs"
+	_ "qvarkk/kvault/docs" // swagger routes
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

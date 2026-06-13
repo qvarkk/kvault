@@ -1,0 +1,58 @@
+version: "2"
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  go: "1.25"
+
+output:
+  formats:
+    text:
+      path: stdout
+      print-issued-lines: true
+      print-linter-name: true
+      colors: true
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - qvarkk/kvault
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+    - misspell
+    - errorlint
+    - gosec
+    - prealloc
+
+  settings:
+    gocritic:
+      enabled-tags: [diagnostic, performance, style]
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+          disabled: true
+        - name: blank-imports
+          severity: warning
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - revive
+      - path: _test\.go
+        text: "SA4000"
+        linters:
+          - staticcheck

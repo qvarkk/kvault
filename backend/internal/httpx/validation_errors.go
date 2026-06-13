@@ -12,7 +12,7 @@ type ValidationDetails struct {
 }
 
 func DetailValidationErrors(err validator.ValidationErrors, locale string) []ValidationDetails {
-	var details []ValidationDetails
+	var details = make([]ValidationDetails, 0, len(err))
 	for _, e := range err {
 		details = append(details, ValidationDetails{
 			Field:   e.Field(),

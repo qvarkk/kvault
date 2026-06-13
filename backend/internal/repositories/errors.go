@@ -27,8 +27,7 @@ func toRepositoryError(err error) error {
 	var pqErr *pq.Error
 
 	if errors.As(err, &pqErr) {
-		switch pqErr.Code.Name() {
-		case CodeNameUniqueViolation:
+		if pqErr.Code.Name() == CodeNameUniqueViolation {
 			return wrapError(ErrAlreadyExists, err)
 		}
 	} else if errors.Is(err, sql.ErrNoRows) {
@@ -39,6 +38,6 @@ func toRepositoryError(err error) error {
 	return wrapError(ErrUnknown, err)
 }
 
-func wrapError(sentinelErr error, err error) error {
-	return fmt.Errorf("%w: %v", sentinelErr, err)
+func wrapError(sentinelErr, err error) error {
+	return fmt.Errorf("%w: %w", sentinelErr, err)
 }
