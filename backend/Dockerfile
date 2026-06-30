@@ -21,11 +21,6 @@ FROM alpine:3.21 AS final
 
 WORKDIR /app
 
-# garage CLI for the one-shot garage-init service;
-# version must match the garage service image in docker-compose.yml
-COPY --from=dxflrs/garage:v2.2.0 /garage /usr/local/bin/garage
-COPY scripts/garage-init.sh /usr/local/bin/garage-init.sh
-
 COPY --from=builder /app/api .
 COPY --from=builder /app/worker .
 COPY --from=builder /app/migrate .

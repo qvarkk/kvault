@@ -8,27 +8,6 @@ configs:
     content: |
       user default off
       user ${REDIS_USER:?REDIS_USER is not defined} on >${REDIS_PASSWORD:?REDIS_PASSWORD is not defined} ~* &* +@all
-  garage_toml:
-    content: |
-      metadata_dir = "/var/lib/garage/meta"
-      data_dir = "/var/lib/garage/data"
-      db_engine = "sqlite"
-
-      replication_factor = 1
-
-      rpc_bind_addr = "[::]:3901"
-      rpc_public_addr = "garage:3901"
-      rpc_secret = "${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET is not defined}"
-
-      [s3_api]
-      s3_region = "garage"
-      api_bind_addr = "[::]:3900"
-      root_domain = ".s3.garage"
-
-      [s3_web]
-      bind_addr = "[::]:3902"
-      root_domain = ".web.garage"
-      index = "index.html"
 
 services:
   frontend:
@@ -50,8 +29,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      garage-init:
-        condition: service_completed_successfully
     restart: unless-stopped
     container_name: kvault_api
 
@@ -66,8 +43,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
-      garage-init:
-        condition: service_completed_successfully
     restart: unless-stopped
     container_name: kvault_worker
 
@@ -80,21 +55,6 @@ services:
         condition: service_healthy
     restart: "no"
     container_name: kvault_migrate
-
-  garage-init:
-    image: ghcr.io/qvarkk/kvault:${KVAULT_VERSION:-latest}
-    entrypoint: ["/bin/sh", "/usr/local/bin/garage-init.sh"]
-    env_file: .env
-    configs:
-      - source: garage_toml
-        target: /etc/garage.toml
-    volumes:
-      - garage_meta:/var/lib/garage/meta
-    depends_on:
-      garage:
-        condition: service_started
-    restart: "no"
-    container_name: kvault_garage_init
 
   redis:
     image: redis:7
@@ -123,20 +83,5 @@ services:
       start_period: 10s
     container_name: kvault_pg
 
-  garage:
-    image: dxflrs/garage:v2.2.0
-    restart: unless-stopped
-    ports:
-      - "${GARAGE_S3_PORT:-3900}:3900"
-    configs:
-      - source: garage_toml
-        target: /etc/garage.toml
-    volumes:
-      - garage_meta:/var/lib/garage/meta
-      - garage_data:/var/lib/garage/data
-    container_name: kvault_garage
-
 volumes:
   pg_data:
-  garage_meta:
-  garage_data:

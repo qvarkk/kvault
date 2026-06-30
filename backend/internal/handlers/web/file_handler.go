@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"io"
 	"mime/multipart"
 	"net/http"
 
@@ -22,6 +23,7 @@ type FileService interface {
 	ClearTrash(ctx context.Context, userID string) error
 	PermanentlyDeleteByID(ctx context.Context, fileID, userID string) error
 	DeleteAllByUserID(ctx context.Context, userID string) error
+	S(ctx context.Context, fileUuid, userID string) (io.ReadCloser, error)
 }
 
 type FileHandler struct {
@@ -47,6 +49,10 @@ type listFileRequest struct {
 
 type fileIDUri struct {
 	ID string `uri:"id" binding:"required,uuid"`
+}
+
+type fileUuidUri struct {
+	Uuid string `uri:"uuid" binding:"required,uuid"`
 }
 
 // @Summary      Upload a PDF file to your vault
@@ -346,4 +352,21 @@ func (h *FileHandler) ClearTrash(ctx *gin.Context) error {
 
 	ctx.Status(http.StatusNoContent)
 	return nil
+}
+
+// @Router       /files/raw/{uuid} [get]
+func (h *FileHandler) Raw(ctx *gin.Context) error {
+	userID := ctx.MustGet("userID").(string)
+
+	var uri fileUuidUri
+	if err := ctx.ShouldBindUri(&uri); err != nil {
+		return err
+	}
+
+	file, err := h.fileService.S(ctx.Request.Context(), userID, uri.Uuid)
+	if err != nil {
+		return err
+	}
+
+	ctx.DataFromReader(200, file.)
 }

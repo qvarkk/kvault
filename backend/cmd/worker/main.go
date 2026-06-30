@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"qvarkk/kvault/config"
-	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/handlers/worker"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/services"
+	"qvarkk/kvault/internal/storage"
 	"qvarkk/kvault/internal/tasks"
 	"qvarkk/kvault/logger"
 
@@ -48,9 +48,9 @@ func main() {
 		}
 	}()
 
-	storage, err := aws.NewAwsStorage(&cfg.Aws, nil)
+	localStorage, err := storage.NewLocalStorage(&cfg.Storage)
 	if err != nil {
-		zap.L().Fatal("Connection to AWS failed", zap.Error(err))
+		zap.L().Error("local storage init failed", zap.Error(err))
 	}
 
 	srv := asynq.NewServer(
@@ -74,7 +74,7 @@ func main() {
 
 	fileRepo := repositories.NewFileRepo(pg.DB)
 	transactor := repositories.NewTransactor(pg.DB)
-	fileService := services.NewFileTaskService(fileRepo, transactor, storage)
+	fileService := services.NewFileTaskService(fileRepo, transactor, localStorage)
 	fileTaskHandler := worker.NewFileTaskHandler(fileService)
 
 	mux := asynq.NewServeMux()

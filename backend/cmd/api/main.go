@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"qvarkk/kvault/config"
-	"qvarkk/kvault/internal/aws"
 	"qvarkk/kvault/internal/postgres"
 	"qvarkk/kvault/internal/redis"
 	"qvarkk/kvault/internal/repositories"
 	"qvarkk/kvault/internal/routes"
 	"qvarkk/kvault/internal/services"
+	"qvarkk/kvault/internal/storage"
 	"qvarkk/kvault/logger"
 
 	"github.com/gin-gonic/gin"
@@ -103,9 +103,9 @@ func run(cfg *config.Config) error {
 		cacheStore = redis.NewNoopCache()
 	}
 
-	storage, err := aws.NewAwsStorage(&cfg.Aws, cfg.Api.CorsOrigins)
+	localStorage, err := storage.NewLocalStorage(&cfg.Storage)
 	if err != nil {
-		return fmt.Errorf("aws connection failed: %w", err)
+		return fmt.Errorf("local storage init failed: %w", err)
 	}
 
 	var (
@@ -121,7 +121,7 @@ func run(cfg *config.Config) error {
 		authService = services.NewAuthService(userRepo, apiKeyRepo, cfg.Auth.ApiKeyTtl)
 		userService = services.NewUserService(userRepo, apiKeyRepo, cfg.Auth.ApiKeyTtl)
 		itemService = services.NewItemService(itemRepo, tagRepo, transactor, cacheStore, enqueuer, cacheConfig.ItemsTtl)
-		fileService = services.NewFileService(fileRepo, transactor, enqueuer, storage, cacheStore, cacheConfig.FilesTtl)
+		fileService = services.NewFileService(fileRepo, transactor, enqueuer, localStorage, cacheStore, cacheConfig.FilesTtl)
 		tagService  = services.NewTagService(tagRepo, itemRepo, transactor, cacheStore, cacheConfig.TagsTtl)
 	)
 

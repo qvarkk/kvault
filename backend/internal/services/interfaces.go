@@ -13,11 +13,11 @@ type Transactor interface {
 }
 
 type FileStorage interface {
-	Upload(ctx context.Context, key string, body io.Reader) error
-	Get(ctx context.Context, key string) (io.ReadCloser, error)
-	Delete(ctx context.Context, key string) error
-	GeneratePresignUrl(ctx context.Context, key, filename string) (url string, expiresAt time.Time, err error)
-	GeneratePresignViewUrl(ctx context.Context, key string) (url string, expiresAt time.Time, err error)
+	Upload(ctx context.Context, body io.Reader) (filename string, err error)
+	Get(ctx context.Context, filename string) (io.ReadCloser, error)
+	Delete(ctx context.Context, filename string) error
+	GenerateDownloadUrl(ctx context.Context, filename, originalName string) (url string, expiresAt time.Time, err error)
+	GenerateViewUrl(ctx context.Context, filename string) (url string, expiresAt time.Time, err error)
 }
 
 type TaskEnqueuer interface {

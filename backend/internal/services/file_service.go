@@ -11,7 +11,6 @@ import (
 
 	"qvarkk/kvault/internal/domain"
 
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
@@ -83,8 +82,7 @@ func (s *FileService) Upload(
 		}
 	}()
 
-	s3Key := uuid.New().String() + ".pdf"
-	err = s.storage.Upload(ctx, s3Key, body)
+	path, err := s.storage.Upload(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +90,7 @@ func (s *FileService) Upload(
 	fileInput := CreateFileInput{
 		UserID:       userID,
 		OriginalName: fileHeader.Filename,
-		S3Key:        s3Key,
+		S3Key:        path,
 		Size:         fileHeader.Size,
 		MimeType:     fileHeader.Header.Get("Content-Type"),
 		Status:       string(domain.FileStatusUploading),
@@ -100,15 +98,15 @@ func (s *FileService) Upload(
 
 	file, err := s.createNew(ctx, &fileInput)
 	if err != nil {
-		_ = s.storage.Delete(ctx, s3Key)
+		_ = s.storage.Delete(ctx, path)
 		return nil, err
 	}
 
 	err = s.tasker.EnqueuePdfProcess(ctx, userID, file.ID)
 	if err != nil {
-		if delErr := s.storage.Delete(ctx, s3Key); delErr != nil {
+		if delErr := s.storage.Delete(ctx, path); delErr != nil {
 			zap.L().Warn("failed to delete s3 object after enqueue failure",
-				zap.String("s3_key", s3Key), zap.Error(delErr))
+				zap.String("s3_key", path), zap.Error(delErr))
 		}
 		if delErr := s.fileRepo.HardDeleteByID(ctx, file.ID); delErr != nil {
 			zap.L().Warn("failed to delete file row after enqueue failure",
@@ -216,7 +214,7 @@ func (s *FileService) GetFilePresignedUrl(ctx context.Context, fileID, userID st
 		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
 	}
 
-	url, expiresAt, err := s.storage.GeneratePresignUrl(ctx, file.S3Key, file.OriginalName)
+	url, expiresAt, err := s.storage.GenerateDownloadUrl(ctx, file.S3Key, file.OriginalName)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "generate presign url error", err)
 	}
@@ -287,7 +285,7 @@ func (s *FileService) GetFilePresignedViewUrl(ctx context.Context, fileID, userI
 		return nil, NewServiceError(ErrFileNotFound, "forbidden", nil)
 	}
 
-	url, expiresAt, err := s.storage.GeneratePresignViewUrl(ctx, file.S3Key)
+	url, expiresAt, err := s.storage.GenerateViewUrl(ctx, file.S3Key)
 	if err != nil {
 		return nil, NewServiceError(ErrInternal, "generate presign view url error", err)
 	}
